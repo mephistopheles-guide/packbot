@@ -175,31 +175,33 @@ class PackBot(commands.Bot):
                 print(f"[SUCCESS] Auto-selected Engine: {self.model_id}")
         except Exception as e:
             print(f"[ERROR] AI Auth Failure: {e}")
+            
+    # Add this near your configuration variables at the top
+    STOCK_CHANNEL_ID = 1522622210542407750 # Replace with your actual Channel ID
+
+    @tasks.loop(hours=1.0)
+    async def update_stock_prices(self):
+        """Fluctuates the Duducoin price every hour and announces it."""
+        old_price = self.db["stocks"]["DUDU"]["price"]
+        change = random.uniform(-0.18, 0.25)
+        new_price = max(1.0, round(old_price * (1 + change), 2))
+    
+        self.db["stocks"]["DUDU"]["price"] = new_price
+        self.db["stocks"]["DUDU"]["last_update"] = time.time()
+        save_data(self.db)
+    
+        # Announce the new price
+        channel = self.get_channel(STOCK_CHANNEL_ID)
+        if channel:
+            embed = discord.Embed(title="📈 Duducoin Market Update", color=0x2b2d31)
+            embed.description = f"The stock price has updated!\n\n**New Price:** {new_price} DDR\n**Change:** {change:+.2%}"
+            await channel.send(embed=embed)
 
         self.update_stock_prices.start()
         await self.tree.sync()
         print(f"--- PACKBOT IS ONLINE ---\n")
 
-# Add this near your configuration variables at the top
-STOCK_CHANNEL_ID = 1522622210542407750 # Replace with your actual Channel ID
 
-@tasks.loop(hours=1.0)
-async def update_stock_prices(self):
-    """Fluctuates the Duducoin price every hour and announces it."""
-    old_price = self.db["stocks"]["DUDU"]["price"]
-    change = random.uniform(-0.18, 0.25)
-    new_price = max(1.0, round(old_price * (1 + change), 2))
-    
-    self.db["stocks"]["DUDU"]["price"] = new_price
-    self.db["stocks"]["DUDU"]["last_update"] = time.time()
-    save_data(self.db)
-    
-    # Announce the new price
-    channel = self.get_channel(STOCK_CHANNEL_ID)
-    if channel:
-        embed = discord.Embed(title="📈 Duducoin Market Update", color=0x2b2d31)
-        embed.description = f"The stock price has updated!\n\n**New Price:** {new_price} DDR\n**Change:** {change:+.2%}"
-        await channel.send(embed=embed)
 
     async def close(self):
         await self.session.close()
@@ -469,6 +471,7 @@ def build_balance_embed(user, balance, loan_amt, loan_due, shares):
         embed.add_field(name="Loans", value="No outstanding debt.", inline=False)
     return embed
 
+        
 # --- PREFIX COMMAND MATRIX ---
 @bot.command(name="help")
 async def help_prefix(ctx): await ctx.send(embed=build_help_embed(ctx.author.id))
