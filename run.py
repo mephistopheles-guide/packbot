@@ -672,12 +672,6 @@ async def gift_slash(interaction: discord.Interaction, target: discord.User, amo
     bot.update_balance(target.id, amount)
     await interaction.response.send_message(f"Successfully transferred {amount} DDR to {target.mention}.")
 
-@bot.tree.command(name="leaderboard", description="View server ranking status.")
-async def leaderboard_slash(interaction: discord.Interaction):
-    sorted_ledger = sorted(bot.db["economy"].items(), key=lambda x: x[1].get("balance", 0), reverse=True)
-    lines = [f"`#{i+1}` <@{uid}> - **{data.get('balance', 0)} DDR**" for i, (uid, data) in enumerate(sorted_ledger[:10])]
-    embed = discord.Embed(title="🏆 Richest Players Leaderboard", description="\n".join(lines) or "Empty market.", color=0x2b2d31)
-    await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="loan", description="Manage borrowing systems.")
 @app_commands.choices(action=[
