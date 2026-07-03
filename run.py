@@ -276,6 +276,10 @@ class MultiplayerBlackjackView(discord.ui.View):
         ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
         self.deck = [{'rank': r, 'suit': s, 'value': 10 if r in ['J', 'Q', 'K'] else (11 if r == 'A' else int(r))} for s in suits for r in ranks]
         random.shuffle(self.deck)
+        
+        # Hide the Hit and Stand buttons while in the lobby phase
+        self.remove_item(self.gameplay_hit)
+        self.remove_item(self.gameplay_stand)
 
     def calc_score(self, hand):
         score = sum(card['value'] for card in hand)
@@ -319,7 +323,7 @@ class MultiplayerBlackjackView(discord.ui.View):
 
             embed.add_field(
                 name=field_name, 
-                value=f"```\n{self.format_hand(p['hand'])}\n```*{status_txt} | Bet: {p['bet']} DDR*", 
+                value=f"```\n{self.format_hand(p['hand'])}\n```*{status_txt}*", 
                 inline=False
             )
         return embed
@@ -354,10 +358,11 @@ class MultiplayerBlackjackView(discord.ui.View):
             self.players[pid]['hand'] = [self.deck.pop(), self.deck.pop()]
         self.dealer_hand = [self.deck.pop(), self.deck.pop()]
         
-        # Switch buttons to gameplay mode
-        self.clear_items()
-        self.add_item(discord.ui.Button(label="Hit", style=discord.ButtonStyle.primary, custom_id="bj_hit"))
-        self.add_item(discord.ui.Button(label="Stand", style=discord.ButtonStyle.secondary, custom_id="bj_stand"))
+        # Safely swap out UI buttons for gameplay
+        self.remove_item(self.join_lobby)
+        self.remove_item(self.start_round)
+        self.add_item(self.gameplay_hit)
+        self.add_item(self.gameplay_stand)
         
         await interaction.response.edit_message(embed=self.generate_embed(), view=self)
 
@@ -406,7 +411,7 @@ class MultiplayerBlackjackView(discord.ui.View):
         d_score = self.calc_score(self.dealer_hand)
         self.clear_items()
         
-        # Process payouts
+        # Process payouts and update balances
         for pid, p in self.players.items():
             p_score = self.calc_score(p['hand'])
             if p['status'] == "bust":
@@ -422,6 +427,10 @@ class MultiplayerBlackjackView(discord.ui.View):
             else:
                 bot.update_balance(pid, p['bet'])
                 p['status'] = "Push (Tie)"
+                
+            # Fetch and display new total balance
+            new_bal = bot.get_balance(pid)
+            p['status'] += f" | Bal: {new_bal} DDR"
                 
         await interaction.response.edit_message(embed=self.generate_embed(finished=True), view=None)
         self.stop()
@@ -470,11 +479,25 @@ async def blacklist_prefix(ctx, target: discord.User):
         await ctx.send(f"Suspended AI access for {target.mention}.")
     save_data(bot.db)
 
-@bot.command(name="award")
-async def award_prefix(ctx, target: discord.User, amount: int):
-    if ctx.author.id != MY_ID: return
-    bot.update_balance(target.id, amount)
-    await ctx.send(f"Added {amount} DDR to {target.mention}'s pocket.")
+@bot.tree.command(name="award", description="Spawn cash or stocks out of nowhere (Owner Only).")
+@app_commands.choices(currency=[
+    app_commands.Choice(name="DDR (Cash)", value="balance"),
+    app_commands.Choice(name="DUDU (Shares)", value="shares")
+])
+async def award_slash(interaction: discord.Interaction, target: discord.User, amount: int, currency: app_commands.Choice[str]):
+    if interaction.user.id != MY_ID: 
+        return await interaction.response.send_message("Denied.", ephemeral=True)
+    
+    uid = bot._init_user(target.id)
+    if currency.value == "balance":
+        bot.db["economy"][uid]["balance"] += amount
+        msg = f"Gave {amount} DDR to {target.mention}."
+    else:
+        bot.db["economy"][uid]["shares"] += amount
+        msg = f"Gave {amount} DUDU shares to {target.mention}."
+    
+    save_data(bot.db)
+    await interaction.response.send_message(msg)
 
 @bot.command(name="gift")
 async def gift_prefix(ctx, target: discord.User, amount: int):
@@ -484,13 +507,21 @@ async def gift_prefix(ctx, target: discord.User, amount: int):
     bot.update_balance(target.id, amount)
     await ctx.send(f"Sent {amount} DDR to {target.mention}!")
 
-@bot.command(name="leaderboard")
-async def leaderboard_prefix(ctx):
-    sorted_ledger = sorted(bot.db["economy"].items(), key=lambda x: x[1].get("balance", 0), reverse=True)
-    lines = [f"`#{i+1}` <@{uid}> - **{data.get('balance', 0)} DDR**" for i, (uid, data) in enumerate(sorted_ledger[:10])]
-    embed = discord.Embed(title="🏆 Richest Players Leaderboard", description="\n".join(lines) or "Empty market.", color=0x2b2d31)
-    await ctx.send(embed=embed)
-
+@bot.tree.command(name="leaderboard", description="View server ranking status for Cash and Stocks.")
+async def leaderboard_slash(interaction: discord.Interaction):
+    # Sort by Cash
+    sorted_cash = sorted(bot.db["economy"].items(), key=lambda x: x[1].get("balance", 0), reverse=True)[:10]
+    # Sort by Shares
+    sorted_stocks = sorted(bot.db["economy"].items(), key=lambda x: x[1].get("shares", 0), reverse=True)[:10]
+    
+    cash_lines = [f"`#{i+1}` <@{uid}> - **{data.get('balance', 0)} DDR**" for i, (uid, data) in enumerate(sorted_cash)]
+    stock_lines = [f"`#{i+1}` <@{uid}> - **{data.get('shares', 0)} DUDU**" for i, (uid, data) in enumerate(sorted_stocks)]
+    
+    embed = discord.Embed(title="🏆 Server Rankings", color=0x2b2d31)
+    embed.add_field(name="💰 Richest Players (DDR)", value="\n".join(cash_lines) or "Empty.", inline=True)
+    embed.add_field(name="📈 Top Shareholders (DUDU)", value="\n".join(stock_lines) or "Empty.", inline=True)
+    
+    await interaction.response.send_message(embed=embed)
 # --- SLASH COMMAND ADMINISTRATIVE INTERFACES ---
 @bot.tree.command(name="help", description="View lists of all working commands.")
 async def help_slash(interaction: discord.Interaction):
