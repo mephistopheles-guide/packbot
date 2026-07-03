@@ -20,7 +20,9 @@ def home():
     return "PackBot is alive and watching."
 
 def run():
-    app.run(host='0.0.0.0', port=8080)
+    # Render requires the web server to bind to its dynamically assigned PORT
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
 
 def keep_alive():
     t = Thread(target=run)
