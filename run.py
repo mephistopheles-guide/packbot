@@ -159,6 +159,7 @@ class PackBot(commands.Bot):
 
     async def setup_hook(self):
         self.session = aiohttp.ClientSession()
+        await self.tree.sync()
         print("\n[SYSTEM] Scanning Google AI Studio for accessible models...")
         try:
             available_models = [
