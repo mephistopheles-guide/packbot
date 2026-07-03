@@ -556,11 +556,6 @@ async def blacklist_slash(interaction: discord.Interaction, target: discord.User
     save_data(bot.db)
     await interaction.response.send_message(msg)
 
-@bot.tree.command(name="award", description="Spawn cash out of nowhere (Owner Only).")
-async def award_slash(interaction: discord.Interaction, target: discord.User, amount: int):
-    if interaction.user.id != MY_ID: return await interaction.response.send_message("Denied.", ephemeral=True)
-    bot.update_balance(target.id, amount)
-    await interaction.response.send_message(f"Gave {amount} DDR to {target.mention}.")
 
 # --- DUDUCOIN STOCK MARKET SCHEDULER ---
 stock_group = app_commands.Group(name="stock", description="Interact with the Duducoin Stock Market.")
