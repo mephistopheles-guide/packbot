@@ -20,7 +20,7 @@ def home():
     return "PackBot is alive and watching."
 
 def run():
-    # Render requires the web server to bind to its dynamically assigned PORT
+    # Render dynamic port fix
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
@@ -505,8 +505,8 @@ async def award_slash(interaction: discord.Interaction, target: discord.User, am
     await interaction.response.send_message(f"Gave {amount} DDR to {target.mention}.")
 
 # --- DUDUCOIN STOCK MARKET SCHEDULER ---
-@bot.tree.group(name="stock", description="Interact with the Duducoin Stock Market.")
-async def stock_group(interaction: discord.Interaction): pass
+stock_group = app_commands.Group(name="stock", description="Interact with the Duducoin Stock Market.")
+bot.tree.add_command(stock_group)
 
 @stock_group.command(name="view", description="Check current Duducoin market prices.")
 async def stock_view(interaction: discord.Interaction):
