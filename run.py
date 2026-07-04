@@ -184,7 +184,7 @@ async def setup_hook(self):
     # Replace with your actual Channel ID
 STOCK_CHANNEL_ID = 1522622210542407750 
 
-    @tasks.loop(hours=1.0)
+@tasks.loop(hours=1.0)
     async def update_stock_prices(self):
         """Fluctuates the Duducoin price every hour and announces it."""
         old_price = self.db["stocks"]["DUDU"]["price"]
