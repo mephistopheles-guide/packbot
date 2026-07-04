@@ -182,7 +182,7 @@ async def setup_hook(self):
         print(f"--- PACKBOT IS ONLINE ---\n")
 
     # Replace with your actual Channel ID
-    STOCK_CHANNEL_ID = 1522622210542407750 
+STOCK_CHANNEL_ID = 1522622210542407750 
 
     @tasks.loop(hours=1.0)
     async def update_stock_prices(self):
