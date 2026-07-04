@@ -479,40 +479,7 @@ def build_balance_embed(user, balance, loan_amt, loan_due, shares):
         
 # --- PREFIX COMMAND MATRIX ---
 
-@bot.command(name="backup")
-async def backup_prefix(ctx):
-    """Owner Only: Uploads the database.json to Discord as a backup."""
-    if ctx.author.id != MY_ID: return
-    try:
-        file = discord.File(DATA_FILE)
-        await ctx.send("Here is the latest database backup. Save this message to restore later.", file=file)
-    except Exception as e:
-        await ctx.send(f"Backup failed: {e}")
 
-@bot.command(name="restore")
-async def restore_prefix(ctx):
-    """Owner Only: Reply to a database.json file with this command to restore it."""
-    if ctx.author.id != MY_ID: return
-    
-    if not ctx.message.reference:
-        return await ctx.send("You must reply to a message containing the backup file.")
-        
-    replied_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-    if not replied_msg.attachments:
-        return await ctx.send("The message you replied to does not have a file.")
-        
-    attachment = replied_msg.attachments[0]
-    if not attachment.filename.endswith('.json'):
-        return await ctx.send("Invalid file type. Must be a JSON.")
-        
-    try:
-        # Download the file from Discord directly over your local file
-        await attachment.save(DATA_FILE)
-        # Reload the bot's memory
-        bot.db = load_data()
-        await ctx.send("Database successfully restored from Discord!")
-    except Exception as e:
-        await ctx.send(f"Restore failed: {e}")
     
 @bot.command(name="help")
 async def help_prefix(ctx): await ctx.send(embed=build_help_embed(ctx.author.id))
