@@ -185,26 +185,26 @@ async def setup_hook(self):
 STOCK_CHANNEL_ID = 1522622210542407750 
 
 @tasks.loop(hours=1.0)
-    async def update_stock_prices(self):
-        """Fluctuates the Duducoin price every hour and announces it."""
-        old_price = self.db["stocks"]["DUDU"]["price"]
-        change = random.uniform(-0.18, 0.25)
-        new_price = max(1.0, round(old_price * (1 + change), 2))
-    
-        self.db["stocks"]["DUDU"]["price"] = new_price
-        self.db["stocks"]["DUDU"]["last_update"] = time.time()
-        save_data(self.db)
+async def update_stock_prices(self):
+    """Fluctuates the Duducoin price every hour and announces it."""
+    old_price = self.db["stocks"]["DUDU"]["price"]
+    change = random.uniform(-0.18, 0.25)
+    new_price = max(1.0, round(old_price * (1 + change), 2))
+
+    self.db["stocks"]["DUDU"]["price"] = new_price
+    self.db["stocks"]["DUDU"]["last_update"] = time.time()
+    save_data(self.db)
     
         # Announce the new price
-        channel = self.get_channel(self.STOCK_CHANNEL_ID)
-        if channel:
-            embed = discord.Embed(title="📈 Duducoin Market Update", color=0x2b2d31)
-            embed.description = f"The stock price has updated!\n\n**New Price:** {new_price} DDR\n**Change:** {change:+.2%}"
-            await channel.send(embed=embed)
+    channel = self.get_channel(self.STOCK_CHANNEL_ID)
+    if channel:
+        embed = discord.Embed(title="📈 Duducoin Market Update", color=0x2b2d31)
+        embed.description = f"The stock price has updated!\n\n**New Price:** {new_price} DDR\n**Change:** {change:+.2%}"
+        await channel.send(embed=embed)
 
-        self.update_stock_prices.start()
-        await self.tree.sync()
-        print(f"--- PACKBOT IS ONLINE ---\n")
+    self.update_stock_prices.start()
+    await self.tree.sync()
+    print(f"--- PACKBOT IS ONLINE ---\n")
 
 
 
