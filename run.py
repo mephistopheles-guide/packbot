@@ -182,6 +182,7 @@ class PackBot(commands.Bot):
         print(f"--- PACKBOT IS ONLINE ---\n")
 
     # Replace with your actual Channel ID
+    # Replace with your actual Channel ID
     STOCK_CHANNEL_ID = 1522622210542407750 
 
     @tasks.loop(hours=1.0)
@@ -201,6 +202,11 @@ class PackBot(commands.Bot):
             embed = discord.Embed(title="📈 Duducoin Market Update", color=0x2b2d31)
             embed.description = f"The stock price has updated!\n\n**New Price:** {new_price} DDR\n**Change:** {change:+.2%}"
             await channel.send(embed=embed)
+
+    @update_stock_prices.before_loop
+    async def before_update_stock_prices(self):
+        """Ensures the bot is fully logged in before trying to send channel messages."""
+        await self.wait_until_ready()
 
     async def close(self):
         await self.session.close()
@@ -474,6 +480,12 @@ def build_balance_embed(user, balance, loan_amt, loan_due, shares):
 
         
 # --- PREFIX COMMAND MATRIX ---
+@bot.command(name="forcestock")
+async def forcestock_prefix(ctx):
+    """Owner Only: Forces the stock market to update and announce immediately."""
+    if ctx.author.id != MY_ID: return
+    await bot.update_stock_prices() 
+    await ctx.send("Stock market update forced successfully.")
 
 @bot.command(name="backup")
 async def backup_prefix(ctx):
