@@ -157,7 +157,7 @@ class PackBot(commands.Bot):
         if self.downtime or user_id in self.db["blacklist"]: return False
         return True
 
-async def setup_hook(self):
+    async def setup_hook(self):
         self.session = aiohttp.ClientSession()
         await self.tree.sync()
         print("\n[SYSTEM] Scanning Google AI Studio for accessible models...")
@@ -182,31 +182,25 @@ async def setup_hook(self):
         print(f"--- PACKBOT IS ONLINE ---\n")
 
     # Replace with your actual Channel ID
-STOCK_CHANNEL_ID = 1522622210542407750 
+    STOCK_CHANNEL_ID = 1522622210542407750 
 
-@tasks.loop(hours=1.0)
-async def update_stock_prices(self):
-    """Fluctuates the Duducoin price every hour and announces it."""
-    old_price = self.db["stocks"]["DUDU"]["price"]
-    change = random.uniform(-0.18, 0.25)
-    new_price = max(1.0, round(old_price * (1 + change), 2))
+    @tasks.loop(hours=1.0)
+    async def update_stock_prices(self):
+        """Fluctuates the Duducoin price every hour and announces it."""
+        old_price = self.db["stocks"]["DUDU"]["price"]
+        change = random.uniform(-0.18, 0.25)
+        new_price = max(1.0, round(old_price * (1 + change), 2))
 
-    self.db["stocks"]["DUDU"]["price"] = new_price
-    self.db["stocks"]["DUDU"]["last_update"] = time.time()
-    save_data(self.db)
-    
+        self.db["stocks"]["DUDU"]["price"] = new_price
+        self.db["stocks"]["DUDU"]["last_update"] = time.time()
+        save_data(self.db)
+        
         # Announce the new price
-    channel = self.get_channel(self.STOCK_CHANNEL_ID)
-    if channel:
-        embed = discord.Embed(title="📈 Duducoin Market Update", color=0x2b2d31)
-        embed.description = f"The stock price has updated!\n\n**New Price:** {new_price} DDR\n**Change:** {change:+.2%}"
-        await channel.send(embed=embed)
-
-    self.update_stock_prices.start()
-    await self.tree.sync()
-    print(f"--- PACKBOT IS ONLINE ---\n")
-
-
+        channel = self.get_channel(self.STOCK_CHANNEL_ID)
+        if channel:
+            embed = discord.Embed(title="📈 Duducoin Market Update", color=0x2b2d31)
+            embed.description = f"The stock price has updated!\n\n**New Price:** {new_price} DDR\n**Change:** {change:+.2%}"
+            await channel.send(embed=embed)
 
     async def close(self):
         await self.session.close()
@@ -244,7 +238,7 @@ async def update_stock_prices(self):
     async def on_message(self, message):
         if message.author.bot: return
         lower_content = message.content.strip().lower()
-        if any(lower_content.startswith(f"+p {c}") for c in ["help", "downtime", "blacklist", "gift", "leaderboard", "award"]):
+        if any(lower_content.startswith(f"+p {c}") for c in ["help", "downtime", "blacklist", "gift", "leaderboard", "award", "backup", "restore"]):
             await self.process_commands(message)
             return
 
@@ -273,6 +267,8 @@ async def update_stock_prices(self):
                         await message.reply(text)
             except: pass
         await self.process_commands(message)
+
+
 
 bot = PackBot()
 
@@ -478,6 +474,41 @@ def build_balance_embed(user, balance, loan_amt, loan_due, shares):
 
         
 # --- PREFIX COMMAND MATRIX ---
+
+@bot.command(name="backup")
+async def backup_prefix(ctx):
+    """Owner Only: Uploads the database.json to Discord as a backup."""
+    if ctx.author.id != MY_ID: return
+    try:
+        file = discord.File(DATA_FILE)
+        await ctx.send("Here is the latest database backup. Save this message to restore later.", file=file)
+    except Exception as e:
+        await ctx.send(f"Backup failed: {e}")
+
+@bot.command(name="restore")
+async def restore_prefix(ctx):
+    """Owner Only: Reply to a database.json file with this command to restore it."""
+    if ctx.author.id != MY_ID: return
+    
+    if not ctx.message.reference:
+        return await ctx.send("You must reply to a message containing the backup file.")
+        
+    replied_msg = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+    if not replied_msg.attachments:
+        return await ctx.send("The message you replied to does not have a file.")
+        
+    attachment = replied_msg.attachments[0]
+    if not attachment.filename.endswith('.json'):
+        return await ctx.send("Invalid file type. Must be a JSON.")
+        
+    try:
+        # Download the file from Discord directly over your local file
+        await attachment.save(DATA_FILE)
+        # Reload the bot's memory
+        bot.db = load_data()
+        await ctx.send("Database successfully restored from Discord!")
+    except Exception as e:
+        await ctx.send(f"Restore failed: {e}")
 
 
     
