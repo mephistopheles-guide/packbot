@@ -182,19 +182,34 @@ class PackBot(commands.Bot):
         print(f"--- PACKBOT IS ONLINE ---\n")
 
     # Replace with your actual Channel ID
-    # Replace with your actual Channel ID
     STOCK_CHANNEL_ID = 1522622210542407750 
 
     @tasks.loop(hours=0.5)
     async def update_stock_prices(self):
-        """Fluctuates the Duducoin price every half hour and announces it."""
+        """Fluctuates the Duducoin price every half hour with random crashes/surges and announces it."""
         try:
             # Failsafe: Rebuild stock data if a backup wiped it
             if "stocks" not in self.db or "DUDU" not in self.db["stocks"]:
                 self.db["stocks"] = {"DUDU": {"price": 20.0, "last_update": time.time()}}
                 
             old_price = self.db["stocks"]["DUDU"]["price"]
-            change = random.uniform(-0.18, 0.25)
+            
+            # --- REALISTIC MARKET EVENT ROLLS ---
+            event_roll = random.random()
+            event_title = "📈 Duducoin Market Update"
+            embed_color = 0x2b2d31
+            
+            if event_roll < 0.08:  # 8% chance of an unpredictable Market Crash
+                change = random.uniform(-0.40, -0.65)
+                event_title = "🚨 DUDUCOIN MARKET CRASH! 🚨"
+                embed_color = 0xe74c3c
+            elif event_roll < 0.14:  # 6% chance of a sudden Bull Run
+                change = random.uniform(0.25, 0.50)
+                event_title = "🚀 DUDUCOIN BULL SURGE! 🚀"
+                embed_color = 0x2ecc71
+            else:  # Normal market drift (centered near 0 to prevent hyperinflation)
+                change = random.uniform(-0.14, 0.15)
+                
             new_price = max(1.0, round(old_price * (1 + change), 2))
 
             self.db["stocks"]["DUDU"]["price"] = new_price
@@ -204,7 +219,7 @@ class PackBot(commands.Bot):
             # Announce the new price
             channel = self.get_channel(self.STOCK_CHANNEL_ID)
             if channel:
-                embed = discord.Embed(title="📈 Duducoin Market Update", color=0x2b2d31)
+                embed = discord.Embed(title=event_title, color=embed_color)
                 embed.description = f"The stock price has updated!\n\n**New Price:** {new_price} DDR\n**Change:** {change:+.2%}"
                 await channel.send(embed=embed)
         except Exception as e:
@@ -243,6 +258,7 @@ class PackBot(commands.Bot):
                 generation_config={"temperature": 1.0, "top_p": 0.95},
                 safety_settings=SAFETY_SETTINGS
             )
+            # Use async call to prevent blocking Discord command loop
             res = await model.generate_content_async(f"{system_instruction}\n\nTARGET/OBJECTIVE: {prompt}")
             return res.text.strip() if res.text else "API blocked output."
         except Exception as e:
@@ -465,7 +481,23 @@ class MultiplayerBlackjackView(discord.ui.View):
 # --- GENERAL EMBED BUILDERS ---
 def build_help_embed(user_id):
     embed = discord.Embed(title="Bot Commands menu", color=0x2b2d31, description="Prefix usage: `+p <command>` or use standard Slash Commands.")
-    embed.add_field(name="💰 Money & Games", value="`/daily` - Claim free daily cash\n`/work` - Put in work for secure cash (5m cooldown)\n`/crime` - High risk high reward action (10m cooldown)\n`/balance` - Check your wallet & loans\n`/gift <user> <amount>` - Send cash to a friend\n`/leaderboard` - See richest users\n`/loan <action>` - Borrow or repay cash\n`/coinflip <bet> <side>` - Flip for double or nothing\n`/blackjack <bet>` - Open a multiplayer card table\n`/slots <bet>` - Play high-stakes slots\n`/rr` - Play a quick round of Russian Roulette", inline=False)
+    embed.add_field(
+        name="💰 Money & Games", 
+        value="`/daily` - Claim free daily cash\n"
+              "`/work` - Put in work for secure cash (5m cooldown)\n"
+              "`/crime` - High risk high reward action (10m cooldown)\n"
+              "`/beg` - Ask around for pocket change (2m cooldown)\n"
+              "`/rob <user>` - Try to swipe cash from a player (15m cooldown)\n"
+              "`/balance` - Check your wallet & loans\n"
+              "`/gift <user> <amount>` - Send cash to a friend\n"
+              "`/leaderboard` - See richest users\n"
+              "`/loan <action>` - Borrow or repay cash\n"
+              "`/coinflip <bet> <side>` - Flip for double or nothing\n"
+              "`/blackjack <bet>` - Open a multiplayer card table\n"
+              "`/slots <bet>` - Play high-stakes slots\n"
+              "`/rr` - Play a quick round of Russian Roulette", 
+        inline=False
+    )
     embed.add_field(name="📈 Stock Market", value="`/stock view` - Check Duducoin market price\n`/stock buy <shares>` - Buy Duducoin stock shares\n`/stock sell <shares>` - Sell your shares back for cash", inline=False)
     embed.add_field(name="🤖 AI Systems", value="`/pack <user>` - Roast someone intensely\n`/glaze <user>` - Hyped praise\n`/lobotomy <user>` - Brainrot custom poetry\n`/lawyer <user> <claim>` - Simulate wild arguments\n`/ask <question>` - Ask the AI anything", inline=False)
     if user_id == MY_ID:
@@ -714,6 +746,79 @@ async def crime(interaction: discord.Interaction):
         bot.db["economy"][uid]["balance"] = max(0, bot.db["economy"][uid]["balance"] - loss)
         save_data(bot.db)
         await interaction.response.send_message(f"🚓 Busted! You got caught by the cops and dropped **{loss} DDR** while running away.")
+
+@bot.tree.command(name="beg", description="Beg for quick pocket change (2m cooldown).")
+async def beg(interaction: discord.Interaction):
+    uid = bot._init_user(interaction.user.id)
+    now = time.time()
+    last_beg = bot.db["economy"][uid].get("last_beg", 0)
+    
+    if now - last_beg < 120:
+        left = int(120 - (now - last_beg))
+        return await interaction.response.send_message(f"People are tired of you begging! Wait {left} more seconds.", ephemeral=True)
+        
+    bot.db["economy"][uid]["last_beg"] = now
+    
+    # 65% chance someone takes pity on you
+    if random.random() < 0.65:
+        payout = random.randint(15, 50)
+        bot.db["economy"][uid]["balance"] += payout
+        save_data(bot.db)
+        new_bal = bot.db["economy"][uid]["balance"]
+        await interaction.response.send_message(f"🥺 Someone tossed **{payout} DDR** into your cup! (Balance: **{new_bal} DDR**)")
+    else:
+        save_data(bot.db)
+        rejections = [
+            "Get a job, bum!",
+            "Someone threw an empty soda can at your head.",
+            "A passerby made eye contact and walked away faster.",
+            "You got ignored completely."
+        ]
+        await interaction.response.send_message(f"❌ {random.choice(rejections)}")
+
+@bot.tree.command(name="rob", description="Attempt to rob another player's wallet (15m cooldown).")
+async def rob(interaction: discord.Interaction, target: discord.User):
+    if target.id == interaction.user.id:
+        return await interaction.response.send_message("You can't rob yourself!", ephemeral=True)
+    if target.bot:
+        return await interaction.response.send_message("You can't rob a bot!", ephemeral=True)
+        
+    uid = bot._init_user(interaction.user.id)
+    target_uid = bot._init_user(target.id)
+    now = time.time()
+    last_rob = bot.db["economy"][uid].get("last_rob", 0)
+    
+    if now - last_rob < 900:
+        left = int(900 - (now - last_rob))
+        return await interaction.response.send_message(f"The cops are patrolling! Wait {left} more seconds before robbing again.", ephemeral=True)
+        
+    target_bal = bot.db["economy"][target_uid]["balance"]
+    if target_bal < 50:
+        return await interaction.response.send_message(f"{target.display_name} is too poor to rob! Let them be.", ephemeral=True)
+        
+    bot.db["economy"][uid]["last_rob"] = now
+    
+    # 45% chance of successful heist
+    if random.random() < 0.45:
+        # Steal between 10% and 25% of the target's wallet
+        stolen = int(target_bal * random.uniform(0.10, 0.25))
+        stolen = max(10, stolen)
+        
+        bot.db["economy"][target_uid]["balance"] -= stolen
+        bot.db["economy"][uid]["balance"] += stolen
+        save_data(bot.db)
+        
+        new_bal = bot.db["economy"][uid]["balance"]
+        await interaction.response.send_message(f"🥷 Sneaky! You robbed {target.mention} and swiped **{stolen} DDR**! (Your Balance: **{new_bal} DDR**)")
+    else:
+        # Penalty: Pay a fine of 50 to 120 DDR to the victim
+        fine = min(bot.db["economy"][uid]["balance"], random.randint(50, 120))
+        bot.db["economy"][uid]["balance"] -= fine
+        bot.db["economy"][target_uid]["balance"] += fine
+        save_data(bot.db)
+        
+        new_bal = bot.db["economy"][uid]["balance"]
+        await interaction.response.send_message(f"🚨 Busted! You got caught trying to rob {target.mention} and had to pay them a **{fine} DDR** penalty! (Your Balance: **{new_bal} DDR**)")
 
 @bot.tree.command(name="balance", description="Check your cash, stocks, and loans.")
 async def balance(interaction: discord.Interaction):
