@@ -187,21 +187,28 @@ class PackBot(commands.Bot):
 
     @tasks.loop(hours=0.5)
     async def update_stock_prices(self):
-        """Fluctuates the Duducoin price every hour and announces it."""
-        old_price = self.db["stocks"]["DUDU"]["price"]
-        change = random.uniform(-0.18, 0.25)
-        new_price = max(1.0, round(old_price * (1 + change), 2))
+        """Fluctuates the Duducoin price every half hour and announces it."""
+        try:
+            # Failsafe: Rebuild stock data if a backup wiped it
+            if "stocks" not in self.db or "DUDU" not in self.db["stocks"]:
+                self.db["stocks"] = {"DUDU": {"price": 20.0, "last_update": time.time()}}
+                
+            old_price = self.db["stocks"]["DUDU"]["price"]
+            change = random.uniform(-0.18, 0.25)
+            new_price = max(1.0, round(old_price * (1 + change), 2))
 
-        self.db["stocks"]["DUDU"]["price"] = new_price
-        self.db["stocks"]["DUDU"]["last_update"] = time.time()
-        save_data(self.db)
-        
-        # Announce the new price
-        channel = self.get_channel(self.STOCK_CHANNEL_ID)
-        if channel:
-            embed = discord.Embed(title="📈 Duducoin Market Update", color=0x2b2d31)
-            embed.description = f"The stock price has updated!\n\n**New Price:** {new_price} DDR\n**Change:** {change:+.2%}"
-            await channel.send(embed=embed)
+            self.db["stocks"]["DUDU"]["price"] = new_price
+            self.db["stocks"]["DUDU"]["last_update"] = time.time()
+            save_data(self.db)
+            
+            # Announce the new price
+            channel = self.get_channel(self.STOCK_CHANNEL_ID)
+            if channel:
+                embed = discord.Embed(title="📈 Duducoin Market Update", color=0x2b2d31)
+                embed.description = f"The stock price has updated!\n\n**New Price:** {new_price} DDR\n**Change:** {change:+.2%}"
+                await channel.send(embed=embed)
+        except Exception as e:
+            print(f"[ERROR] Stock Loop Failed This Cycle: {e}")
 
     @update_stock_prices.before_loop
     async def before_update_stock_prices(self):
@@ -236,7 +243,7 @@ class PackBot(commands.Bot):
                 generation_config={"temperature": 1.0, "top_p": 0.95},
                 safety_settings=SAFETY_SETTINGS
             )
-            res = model.generate_content(f"{system_instruction}\n\nTARGET/OBJECTIVE: {prompt}")
+            res = await model.generate_content_async(f"{system_instruction}\n\nTARGET/OBJECTIVE: {prompt}")
             return res.text.strip() if res.text else "API blocked output."
         except Exception as e:
             return f"API Error: {str(e)[:50]}"
