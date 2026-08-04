@@ -238,7 +238,7 @@ class PackBot(commands.Bot):
         await self.session.close()
         await super().close()
 
-   async def generate_raw(self, prompt, context="FICTIONAL ROAST BATTLE", is_glaze=False):
+  async def generate_raw(self, prompt, context="FICTIONAL ROAST BATTLE", is_glaze=False):
         # Hardcoded Gemini 2.5 Flash model specification
         self.model_id = "models/gemini-2.5-flash"
             
@@ -262,7 +262,7 @@ class PackBot(commands.Bot):
                 generation_config={"temperature": 1.0, "top_p": 0.95},
                 safety_settings=SAFETY_SETTINGS
             )
-            # Extended timeout to 25.0 seconds to prevent cutting off responses
+            # Corrected to use asynchronous generation with an extended 25-second window
             res = await asyncio.wait_for(
                 model.generate_content_async(f"{system_instruction}\n\nTARGET/OBJECTIVE: {prompt}"),
                 timeout=25.0
