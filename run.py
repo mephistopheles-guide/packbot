@@ -238,9 +238,9 @@ class PackBot(commands.Bot):
         await self.session.close()
         await super().close()
 
-    async def generate_raw(self, prompt, context="FICTIONAL ROAST BATTLE", is_glaze=False):
-        if not self.model_id:
-            return "System blinded: No API model active."
+   async def generate_raw(self, prompt, context="FICTIONAL ROAST BATTLE", is_glaze=False):
+        # Hardcoded Gemini 2.5 Flash model specification
+        self.model_id = "models/gemini-2.5-flash"
             
         if is_glaze:
             system_instruction = (
@@ -262,10 +262,10 @@ class PackBot(commands.Bot):
                 generation_config={"temperature": 1.0, "top_p": 0.95},
                 safety_settings=SAFETY_SETTINGS
             )
-            # Added 8-second timeout guard to prevent permanent hanging/thinking states
+            # Extended timeout to 25.0 seconds to prevent cutting off responses
             res = await asyncio.wait_for(
                 model.generate_content_async(f"{system_instruction}\n\nTARGET/OBJECTIVE: {prompt}"),
-                timeout=8.0
+                timeout=25.0
             )
             return res.text.strip() if res.text else "API blocked output."
         except asyncio.TimeoutError:
