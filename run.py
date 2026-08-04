@@ -20,7 +20,6 @@ def home():
     return "PackBot is alive and watching."
 
 def run():
-    # Render dynamic port fix
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
@@ -47,8 +46,14 @@ def load_data():
             if "economy" not in data: data["economy"] = {}
             if "blacklist" not in data: data["blacklist"] = []
             if "stocks" not in data: data["stocks"] = {"DUDU": {"price": 20.0, "last_update": time.time()}}
+            if "factions" not in data: data["factions"] = {}
             return data
-    return {"economy": {}, "blacklist": [], "stocks": {"DUDU": {"price": 20.0, "last_update": time.time()}}}
+    return {
+        "economy": {}, 
+        "blacklist": [], 
+        "stocks": {"DUDU": {"price": 20.0, "last_update": time.time()}},
+        "factions": {}
+    }
 
 def save_data(data):
     with open(DATA_FILE, "w") as f:
@@ -112,7 +117,8 @@ class PackBot(commands.Bot):
                 "loan_amount": 0,
                 "loan_due": 0,
                 "loan_interest": 0.0,
-                "shares": 0
+                "shares": 0,
+                "faction": None
             }
         else:
             defaults = {
@@ -121,7 +127,8 @@ class PackBot(commands.Bot):
                 "loan_amount": 0, 
                 "loan_due": 0, 
                 "loan_interest": 0.0,
-                "shares": 0
+                "shares": 0,
+                "faction": None
             }
             for k, v in defaults.items():
                 if k not in self.db["economy"][uid]:
@@ -177,42 +184,36 @@ class PackBot(commands.Bot):
         except Exception as e:
             print(f"[ERROR] AI Auth Failure: {e}")
             
-        # START THE TASK HERE PROPERLY
         self.update_stock_prices.start()
         print(f"--- PACKBOT IS ONLINE ---\n")
 
-    # Replace with your actual Channel ID
     STOCK_CHANNEL_ID = 1522622210542407750 
 
     @tasks.loop(hours=0.5)
     async def update_stock_prices(self):
         """Fluctuates Duducoin dynamically with realistic upside, crashes, surges, and dip-protection."""
         try:
-            # Failsafe: Rebuild stock data if a backup wiped it
             if "stocks" not in self.db or "DUDU" not in self.db["stocks"]:
                 self.db["stocks"] = {"DUDU": {"price": 20.0, "last_update": time.time()}}
                 
             old_price = self.db["stocks"]["DUDU"]["price"]
-            
-            # --- REALISTIC & BALANCED MARKET EVENT ROLLS ---
             event_roll = random.random()
             event_title = "📈 Duducoin Market Update"
             embed_color = 0x2b2d31
             
-            # Dip Recovery: If price drops below 10 DDR, force a bullish bias so it doesn't get trapped at 1.0
             if old_price < 10.0 and event_roll < 0.45:
                 change = random.uniform(0.20, 0.60)
                 event_title = "🟢 DUDUCOIN DIP RECOVERY! 🟢"
                 embed_color = 0x2ecc71
-            elif event_roll < 0.08:  # 8% chance of an unpredictable Market Crash
+            elif event_roll < 0.08:
                 change = random.uniform(-0.25, -0.45)
                 event_title = "🚨 DUDUCOIN MARKET CRASH! 🚨"
                 embed_color = 0xe74c3c
-            elif event_roll < 0.18:  # 10% chance of a sudden Bull Surge
+            elif event_roll < 0.18:
                 change = random.uniform(0.35, 0.80)
                 event_title = "🚀 DUDUCOIN BULL SURGE! 🚀"
                 embed_color = 0x2ecc71
-            else:  # Normal market volatility (-15% to +22% for healthy long-term growth)
+            else:
                 change = random.uniform(-0.15, 0.22)
                 
             new_price = max(1.0, round(old_price * (1 + change), 2))
@@ -221,7 +222,6 @@ class PackBot(commands.Bot):
             self.db["stocks"]["DUDU"]["last_update"] = time.time()
             save_data(self.db)
             
-            # Announce the new price
             channel = self.get_channel(self.STOCK_CHANNEL_ID)
             if channel:
                 embed = discord.Embed(title=event_title, color=embed_color)
@@ -232,7 +232,6 @@ class PackBot(commands.Bot):
 
     @update_stock_prices.before_loop
     async def before_update_stock_prices(self):
-        """Ensures the bot is fully logged in before trying to send channel messages."""
         await self.wait_until_ready()
 
     async def close(self):
@@ -263,7 +262,6 @@ class PackBot(commands.Bot):
                 generation_config={"temperature": 1.0, "top_p": 0.95},
                 safety_settings=SAFETY_SETTINGS
             )
-            # Use async call to prevent blocking Discord command loop
             res = await model.generate_content_async(f"{system_instruction}\n\nTARGET/OBJECTIVE: {prompt}")
             return res.text.strip() if res.text else "API blocked output."
         except Exception as e:
@@ -302,8 +300,6 @@ class PackBot(commands.Bot):
             except: pass
         await self.process_commands(message)
 
-
-
 bot = PackBot()
 
 # --- MULTIPLAYER BLACKJACK ENGINE ---
@@ -312,8 +308,6 @@ class MultiplayerBlackjackView(discord.ui.View):
         super().__init__(timeout=90)
         self.host = host
         self.initial_bet = initial_bet
-        
-        # Player tracking: {user_id: {"user": Member, "bet": int, "hand": [], "status": "playing" | "stood" | "bust"}}
         self.players = {host.id: {"user": host, "bet": initial_bet, "hand": [], "status": "playing"}}
         self.started = False
         self.current_turn_index = 0
@@ -325,7 +319,6 @@ class MultiplayerBlackjackView(discord.ui.View):
         self.deck = [{'rank': r, 'suit': s, 'value': 10 if r in ['J', 'Q', 'K'] else (11 if r == 'A' else int(r))} for s in suits for r in ranks]
         random.shuffle(self.deck)
         
-        # Hide the Hit and Stand buttons while in the lobby phase
         self.remove_item(self.gameplay_hit)
         self.remove_item(self.gameplay_stand)
 
@@ -350,14 +343,12 @@ class MultiplayerBlackjackView(discord.ui.View):
             embed.add_field(name="Players Waiting", value=players_list or "None", inline=False)
             return embed
 
-        # Dealer field
         if not finished:
             embed.add_field(name="Dealer Hand", value=f"```\n{self.format_hand(self.dealer_hand, hide_second=True)}\n```", inline=False)
         else:
             d_score = self.calc_score(self.dealer_hand)
             embed.add_field(name=f"Dealer Hand [Score: {d_score}]", value=f"```\n{self.format_hand(self.dealer_hand)}\n```", inline=False)
 
-        # Players fields
         for pid in self.player_ids_order:
             p = self.players[pid]
             score = self.calc_score(p['hand'])
@@ -401,12 +392,10 @@ class MultiplayerBlackjackView(discord.ui.View):
         self.started = True
         self.player_ids_order = list(self.players.keys())
         
-        # Deal initial cards
         for pid in self.player_ids_order:
             self.players[pid]['hand'] = [self.deck.pop(), self.deck.pop()]
         self.dealer_hand = [self.deck.pop(), self.deck.pop()]
         
-        # Safely swap out UI buttons for gameplay
         self.remove_item(self.join_lobby)
         self.remove_item(self.start_round)
         self.add_item(self.gameplay_hit)
@@ -419,7 +408,6 @@ class MultiplayerBlackjackView(discord.ui.View):
         if custom_id in ["bj_join", "bj_start"]:
             return True
             
-        # Gameplay button check
         current_player_id = self.player_ids_order[self.current_turn_index]
         if interaction.user.id != current_player_id:
             await interaction.response.send_message("It is not your turn yet!", ephemeral=True)
@@ -452,14 +440,12 @@ class MultiplayerBlackjackView(discord.ui.View):
             await interaction.response.edit_message(embed=self.generate_embed(), view=self)
 
     async def resolve_dealer_and_end(self, interaction):
-        # Dealer hits until 17
         while self.calc_score(self.dealer_hand) < 17:
             self.dealer_hand.append(self.deck.pop())
             
         d_score = self.calc_score(self.dealer_hand)
         self.clear_items()
         
-        # Process payouts and update balances
         for pid, p in self.players.items():
             p_score = self.calc_score(p['hand'])
             if p['status'] == "bust":
@@ -476,7 +462,6 @@ class MultiplayerBlackjackView(discord.ui.View):
                 bot.update_balance(pid, p['bet'])
                 p['status'] = "Push (Tie)"
                 
-            # Fetch and display new total balance
             new_bal = bot.get_balance(pid)
             p['status'] += f" | Bal: {new_bal} DDR"
                 
@@ -504,6 +489,18 @@ def build_help_embed(user_id):
         inline=False
     )
     embed.add_field(name="📈 Stock Market", value="`/stock view` - Check Duducoin market price\n`/stock buy <shares>` - Buy Duducoin stock shares\n`/stock sell <shares>` - Sell your shares back for cash", inline=False)
+    embed.add_field(
+        name="⚔️ Military & Factions", 
+        value="`/army create <name>` - Found a military regime (1,000 DDR)\n"
+              "`/army info [name]` - View military base stats & troops\n"
+              "`/army recruit <unit> <count>` - Recruit Infantry, Tanks, or Artillery\n"
+              "`/army deposit <amount>` - Fund your regime's treasury\n"
+              "`/army doctrine <tactic>` - Set combat strategy (Blitz, Trench, etc.)\n"
+              "`/army rank <user> <role>` - Promote members\n"
+              "`/war raid <target_regime>` - Conduct a raid on enemy base\n"
+              "`/war treaty <action> <target>` - Propose peace pacts",
+        inline=False
+    )
     embed.add_field(name="🤖 AI Systems", value="`/pack <user>` - Roast someone intensely\n`/glaze <user>` - Hyped praise\n`/lobotomy <user>` - Brainrot custom poetry\n`/lawyer <user> <claim>` - Simulate wild arguments\n`/ask <question>` - Ask the AI anything", inline=False)
     if user_id == MY_ID:
         embed.add_field(name="⚙️ Admin Settings", value="`/downtime` - Toggle bot AI access\n`/blacklist <user>` - Block user from AI\n`/award <user> <amount>` - Print free cash into existence\n`/stock set <price>` - Force set stock price", inline=False)
@@ -522,18 +519,15 @@ def build_balance_embed(user, balance, loan_amt, loan_due, shares):
         embed.add_field(name="Loans", value="No outstanding debt.", inline=False)
     return embed
 
-        
 # --- PREFIX COMMAND MATRIX ---
 @bot.command(name="forcestock")
 async def forcestock_prefix(ctx):
-    """Owner Only: Forces the stock market to update and announce immediately."""
     if ctx.author.id != MY_ID: return
     await bot.update_stock_prices() 
     await ctx.send("Stock market update forced successfully.")
 
 @bot.command(name="setstock")
 async def setstock_prefix(ctx, price: float):
-    """Owner Only: Manually set the Duducoin market price."""
     if ctx.author.id != MY_ID: return
     if price < 1.0:
         return await ctx.send("Price cannot be set lower than 1.0 DDR.")
@@ -544,7 +538,6 @@ async def setstock_prefix(ctx, price: float):
 
 @bot.command(name="backup")
 async def backup_prefix(ctx):
-    """Owner Only: Uploads the database.json to Discord as a backup."""
     if ctx.author.id != MY_ID: return
     try:
         file = discord.File(DATA_FILE)
@@ -554,9 +547,7 @@ async def backup_prefix(ctx):
 
 @bot.command(name="restore")
 async def restore_prefix(ctx):
-    """Owner Only: Reply to a database.json file with this command to restore it."""
     if ctx.author.id != MY_ID: return
-    
     if not ctx.message.reference:
         return await ctx.send("You must reply to a message containing the backup file.")
         
@@ -569,16 +560,12 @@ async def restore_prefix(ctx):
         return await ctx.send("Invalid file type. Must be a JSON.")
         
     try:
-        # Download the file from Discord directly over your local file
         await attachment.save(DATA_FILE)
-        # Reload the bot's memory
         bot.db = load_data()
         await ctx.send("Database successfully restored from Discord!")
     except Exception as e:
         await ctx.send(f"Restore failed: {e}")
 
-
-    
 @bot.command(name="help")
 async def help_prefix(ctx): await ctx.send(embed=build_help_embed(ctx.author.id))
 
@@ -629,9 +616,7 @@ async def gift_prefix(ctx, target: discord.User, amount: int):
 
 @bot.tree.command(name="leaderboard", description="View server ranking status for Cash and Stocks.")
 async def leaderboard_slash(interaction: discord.Interaction):
-    # Sort by Cash
     sorted_cash = sorted(bot.db["economy"].items(), key=lambda x: x[1].get("balance", 0), reverse=True)[:10]
-    # Sort by Shares
     sorted_stocks = sorted(bot.db["economy"].items(), key=lambda x: x[1].get("shares", 0), reverse=True)[:10]
     
     cash_lines = [f"`#{i+1}` <@{uid}> - **{data.get('balance', 0)} DDR**" for i, (uid, data) in enumerate(sorted_cash)]
@@ -642,6 +627,7 @@ async def leaderboard_slash(interaction: discord.Interaction):
     embed.add_field(name="📈 Top Shareholders (DUDU)", value="\n".join(stock_lines) or "Empty.", inline=True)
     
     await interaction.response.send_message(embed=embed)
+
 # --- SLASH COMMAND ADMINISTRATIVE INTERFACES ---
 @bot.tree.command(name="help", description="View lists of all working commands.")
 async def help_slash(interaction: discord.Interaction):
@@ -664,7 +650,6 @@ async def blacklist_slash(interaction: discord.Interaction, target: discord.User
         msg = f"Blocked {target.name}."
     save_data(bot.db)
     await interaction.response.send_message(msg)
-
 
 # --- DUDUCOIN STOCK MARKET SCHEDULER ---
 stock_group = app_commands.Group(name="stock", description="Interact with the Duducoin Stock Market.")
@@ -725,13 +710,296 @@ async def stock_set(interaction: discord.Interaction, price: float):
     save_data(bot.db)
     await interaction.response.send_message(f"✅ Duducoin market price manually set to **{round(price, 2)} DDR**.")
 
+# --- MILITARY & FACTION ENGINE ---
+army_group = app_commands.Group(name="army", description="Manage military regimes and recruited forces.")
+war_group = app_commands.Group(name="war", description="Conduct strategic warfare and base raids.")
+bot.tree.add_command(army_group)
+bot.tree.add_command(war_group)
+
+UNIT_STATS = {
+    "infantry": {"cost": 50, "atk": 10, "def": 10, "name": "Infantry Division"},
+    "tanks": {"cost": 250, "atk": 60, "def": 35, "name": "Panzer/Armor Brigade"},
+    "artillery": {"cost": 180, "atk": 45, "def": 20, "name": "Heavy Artillery Battery"},
+    "bunkers": {"cost": 300, "atk": 0, "def": 70, "name": "Fortified Bunkers"}
+}
+
+def get_faction_power(faction_data):
+    army = faction_data.get("army", {})
+    total_atk = sum(army.get(u, 0) * UNIT_STATS[u]["atk"] for u in UNIT_STATS)
+    total_def = sum(army.get(u, 0) * UNIT_STATS[u]["def"] for u in UNIT_STATS)
+    
+    doctrine = faction_data.get("doctrine", "balanced")
+    if doctrine == "blitzkrieg":
+        total_atk = int(total_atk * 1.25)
+        total_def = int(total_def * 0.85)
+    elif doctrine == "trench":
+        total_def = int(total_def * 1.35)
+        total_atk = int(total_atk * 0.80)
+        
+    return total_atk, total_def
+
+@army_group.command(name="create", description="Found a new Military Regime (Cost: 1,000 DDR).")
+async def army_create(interaction: discord.Interaction, name: str):
+    uid = bot._init_user(interaction.user.id)
+    if bot.db["economy"][uid]["faction"]:
+        return await interaction.response.send_message("You are already part of a military regime!", ephemeral=True)
+        
+    if bot.db["economy"][uid]["balance"] < 1000:
+        return await interaction.response.send_message("Founding a military regime requires **1,000 DDR**.", ephemeral=True)
+        
+    faction_id = name.strip().lower()
+    if faction_id in bot.db["factions"]:
+        return await interaction.response.send_message("A regime with this name already exists!", ephemeral=True)
+        
+    bot.db["economy"][uid]["balance"] -= 1000
+    bot.db["economy"][uid]["faction"] = faction_id
+    
+    bot.db["factions"][faction_id] = {
+        "display_name": name.strip(),
+        "leader_id": str(interaction.user.id),
+        "treasury": 0,
+        "members": {str(interaction.user.id): "Commander"},
+        "doctrine": "balanced",
+        "army": {"infantry": 5, "tanks": 0, "artillery": 0, "bunkers": 1},
+        "last_raid": 0,
+        "grace_period": 0,
+        "treaties": []
+    }
+    save_data(bot.db)
+    await interaction.response.send_message(f"🎖️ Military Regime **{name.strip()}** has been founded! You have been appointed **Commander**.")
+
+@army_group.command(name="join", description="Join an existing Military Regime.")
+async def army_join(interaction: discord.Interaction, regime_name: str):
+    uid = bot._init_user(interaction.user.id)
+    if bot.db["economy"][uid]["faction"]:
+        return await interaction.response.send_message("Leave your current regime before joining another.", ephemeral=True)
+        
+    fid = regime_name.strip().lower()
+    if fid not in bot.db["factions"]:
+        return await interaction.response.send_message("Regime not found.", ephemeral=True)
+        
+    bot.db["economy"][uid]["faction"] = fid
+    bot.db["factions"][fid]["members"][str(interaction.user.id)] = "Recruit"
+    save_data(bot.db)
+    await interaction.response.send_message(f"Enlisted in **{bot.db['factions'][fid]['display_name']}** as a **Recruit**!")
+
+@army_group.command(name="info", description="View military base stats, treasury, and forces.")
+async def army_info(interaction: discord.Interaction, regime_name: str = None):
+    uid = bot._init_user(interaction.user.id)
+    fid = regime_name.strip().lower() if regime_name else bot.db["economy"][uid]["faction"]
+    
+    if not fid or fid not in bot.db["factions"]:
+        return await interaction.response.send_message("Specify a valid military regime.", ephemeral=True)
+        
+    fac = bot.db["factions"][fid]
+    atk, def_pow = get_faction_power(fac)
+    army = fac.get("army", {})
+    
+    embed = discord.Embed(title=f"🎖️ Regime Report: {fac['display_name']}", color=0x2b2d31)
+    embed.add_field(name="Leader / Commander", value=f"<@{fac['leader_id']}>", inline=True)
+    embed.add_field(name="War Treasury", value=f"**{fac['treasury']} DDR**", inline=True)
+    embed.add_field(name="Active Doctrine", value=f"`{fac['doctrine'].upper()}`", inline=True)
+    
+    embed.add_field(name="⚔️ Combat Power", value=f"Total Attack: **{atk} ATK**\nTotal Defense: **{def_pow} DEF**", inline=False)
+    
+    troops_desc = "\n".join([f"• **{UNIT_STATS[u]['name']}**: {army.get(u, 0)}" for u in UNIT_STATS])
+    embed.add_field(name="🪖 Recruited Forces", value=troops_desc, inline=False)
+    embed.add_field(name="👥 Roster Count", value=f"{len(fac['members'])} Active Personnel", inline=True)
+    
+    await interaction.response.send_message(embed=embed)
+
+@army_group.command(name="deposit", description="Deposit DDR from your personal wallet into regime treasury.")
+async def army_deposit(interaction: discord.Interaction, amount: int):
+    if amount <= 0: return await interaction.response.send_message("Invalid amount.", ephemeral=True)
+    uid = bot._init_user(interaction.user.id)
+    fid = bot.db["economy"][uid]["faction"]
+    
+    if not fid: return await interaction.response.send_message("You are not in a military regime.", ephemeral=True)
+    if bot.get_balance(interaction.user.id) < amount:
+        return await interaction.response.send_message("Insufficient DDR.", ephemeral=True)
+        
+    bot.update_balance(interaction.user.id, -amount)
+    bot.db["factions"][fid]["treasury"] += amount
+    save_data(bot.db)
+    await interaction.response.send_message(f"Deposited **{amount} DDR** into the war treasury! (Treasury: **{bot.db['factions'][fid]['treasury']} DDR**)")
+
+@army_group.command(name="recruit", description="Purchase units for your regime using personal or treasury cash.")
+@app_commands.choices(unit=[
+    app_commands.Choice(name="Infantry Division (50 DDR)", value="infantry"),
+    app_commands.Choice(name="Panzer/Armor Brigade (250 DDR)", value="tanks"),
+    app_commands.Choice(name="Heavy Artillery Battery (180 DDR)", value="artillery"),
+    app_commands.Choice(name="Fortified Bunker (300 DDR)", value="bunkers")
+])
+async def army_recruit(interaction: discord.Interaction, unit: app_commands.Choice[str], count: int = 1):
+    if count <= 0: return await interaction.response.send_message("Invalid count.", ephemeral=True)
+    uid = bot._init_user(interaction.user.id)
+    fid = bot.db["economy"][uid]["faction"]
+    if not fid: return await interaction.response.send_message("Enlist in a regime first.", ephemeral=True)
+    
+    unit_key = unit.value
+    total_cost = UNIT_STATS[unit_key]["cost"] * count
+    
+    if bot.get_balance(interaction.user.id) < total_cost:
+        return await interaction.response.send_message(f"Recruiting {count}x {UNIT_STATS[unit_key]['name']} costs **{total_cost} DDR**.", ephemeral=True)
+        
+    bot.update_balance(interaction.user.id, -total_cost)
+    bot.db["factions"][fid]["army"][unit_key] = bot.db["factions"][fid]["army"].get(unit_key, 0) + count
+    save_data(bot.db)
+    await interaction.response.send_message(f"🪖 Recruited **{count}x {UNIT_STATS[unit_key]['name']}** into the regime's army!")
+
+@army_group.command(name="doctrine", description="Set military command doctrine (Leader/Generals only).")
+@app_commands.choices(tactic=[
+    app_commands.Choice(name="Blitzkrieg (+25% ATK, -15% DEF)", value="blitzkrieg"),
+    app_commands.Choice(name="Trench Warfare (+35% DEF, -20% ATK)", value="trench"),
+    app_commands.Choice(name="Scorched Earth (Deny 20% raided loot)", value="scorched"),
+    app_commands.Choice(name="Balanced Standard", value="balanced")
+])
+async def army_doctrine(interaction: discord.Interaction, tactic: app_commands.Choice[str]):
+    uid = bot._init_user(interaction.user.id)
+    fid = bot.db["economy"][uid]["faction"]
+    if not fid: return await interaction.response.send_message("No regime joined.", ephemeral=True)
+    
+    fac = bot.db["factions"][fid]
+    role = fac["members"].get(str(interaction.user.id), "Recruit")
+    if role not in ["Commander", "General"]:
+        return await interaction.response.send_message("Only Commanders or Generals can change doctrines.", ephemeral=True)
+        
+    fac["doctrine"] = tactic.value
+    save_data(bot.db)
+    await interaction.response.send_message(f"⚔️ Military strategy updated to **{tactic.name}**!")
+
+@war_group.command(name="raid", description="Raid an enemy military base (2h cooldown per regime).")
+async def war_raid(interaction: discord.Interaction, target_regime: str):
+    uid = bot._init_user(interaction.user.id)
+    attacker_fid = bot.db["economy"][uid]["faction"]
+    
+    if not attacker_fid:
+        return await interaction.response.send_message("You must belong to a military regime to launch a raid!", ephemeral=True)
+        
+    defender_fid = target_regime.strip().lower()
+    if defender_fid not in bot.db["factions"]:
+        return await interaction.response.send_message("Target regime does not exist.", ephemeral=True)
+        
+    if attacker_fid == defender_fid:
+        return await interaction.response.send_message("You cannot raid your own base!", ephemeral=True)
+        
+    atk_fac = bot.db["factions"][attacker_fid]
+    def_fac = bot.db["factions"][defender_fid]
+    
+    # Check non-aggression treaties
+    if defender_fid in atk_fac.get("treaties", []):
+        return await interaction.response.send_message("You have a active Peace Treaty signed with this regime!", ephemeral=True)
+        
+    now = time.time()
+    if now - atk_fac.get("last_raid", 0) < 7200:
+        left = int((7200 - (now - atk_fac.get("last_raid", 0))) / 60)
+        return await interaction.response.send_message(f"Your troops are re-supplying! Wait {left} minutes before raiding again.", ephemeral=True)
+        
+    if now < def_fac.get("grace_period", 0):
+        left = int((def_fac["grace_period"] - now) / 60)
+        return await interaction.response.send_message(f"Target is under Post-War Shield Protection! Grace period ends in {left} minutes.", ephemeral=True)
+        
+    atk_fac["last_raid"] = now
+    
+    # Combat Resolution Calculations
+    atk_power, _ = get_faction_power(atk_fac)
+    _, def_power = get_faction_power(def_fac)
+    
+    if atk_power <= 0:
+        return await interaction.response.send_message("Your regime has no offensive force! Recruit troops first.", ephemeral=True)
+        
+    # Introduce tactical rng variability (+- 15%)
+    combat_atk = atk_power * random.uniform(0.85, 1.15)
+    combat_def = def_power * random.uniform(0.85, 1.15)
+    
+    if combat_atk > combat_def:
+        # Attacker Victory
+        stolen_ratio = 0.25 if def_fac.get("doctrine") != "scorched" else 0.15
+        stolen_cash = int(def_fac["treasury"] * stolen_ratio)
+        def_fac["treasury"] -= stolen_cash
+        atk_fac["treasury"] += stolen_cash
+        
+        # Casualty calculation (Attacker loses up to 10% troops, Defender up to 25%)
+        for u in list(def_fac["army"].keys()):
+            def_fac["army"][u] = int(def_fac["army"][u] * 0.75)
+        for u in list(atk_fac["army"].keys()):
+            atk_fac["army"][u] = int(atk_fac["army"][u] * 0.90)
+            
+        def_fac["grace_period"] = now + 14400 # 4-hour shield protection after losing raid
+        save_data(bot.db)
+        
+        embed = discord.Embed(title="💥 RAID VICTORY!", color=0x2ecc71)
+        embed.description = (
+            f"**{atk_fac['display_name']}** successfully breached **{def_fac['display_name']}**'s defense grid!\n\n"
+            f"⚔️ **Attacker Offense:** {int(combat_atk)} ATK\n"
+            f"🛡️ **Defender Defense:** {int(combat_def)} DEF\n"
+            f"💰 **Loot Swiped:** {stolen_cash} DDR from Treasury\n"
+            f"🛡️ Target has gained a 4-hour post-war shield."
+        )
+        await interaction.response.send_message(embed=embed)
+    else:
+        # Defender Defeats Raid
+        penalty = min(atk_fac["treasury"], random.randint(100, 300))
+        atk_fac["treasury"] -= penalty
+        def_fac["treasury"] += penalty
+        
+        # Attacker heavy casualties
+        for u in list(atk_fac["army"].keys()):
+            atk_fac["army"][u] = int(atk_fac["army"][u] * 0.70)
+            
+        save_data(bot.db)
+        embed = discord.Embed(title="🛡️ RAID REPUDIATED / DEFENDED!", color=0xe74c3c)
+        embed.description = (
+            f"**{def_fac['display_name']}** held the defensive line against **{atk_fac['display_name']}**!\n\n"
+            f"⚔️ **Attacker Offense:** {int(combat_atk)} ATK\n"
+            f"🛡️ **Defender Defense:** {int(combat_def)} DEF\n"
+            f"💸 **War Reparations Paid:** {penalty} DDR to Defender Treasury"
+        )
+        await interaction.response.send_message(embed=embed)
+
+@war_group.command(name="treaty", description="Sign or cancel peace treaties between military regimes.")
+@app_commands.choices(action=[
+    app_commands.Choice(name="Sign Peace Treaty", value="sign"),
+    app_commands.Choice(name="Break Peace Treaty", value="break")
+])
+async def war_treaty(interaction: discord.Interaction, action: app_commands.Choice[str], target: str):
+    uid = bot._init_user(interaction.user.id)
+    fid = bot.db["economy"][uid]["faction"]
+    if not fid: return await interaction.response.send_message("You belong to no regime.", ephemeral=True)
+    
+    fac = bot.db["factions"][fid]
+    if fac["members"].get(str(interaction.user.id)) not in ["Commander", "General"]:
+        return await interaction.response.send_message("Only Commanders can negotiate treaties.", ephemeral=True)
+        
+    tfid = target.strip().lower()
+    if tfid not in bot.db["factions"]:
+        return await interaction.response.send_message("Target regime not found.", ephemeral=True)
+        
+    if action.value == "sign":
+        if tfid not in fac.get("treaties", []):
+            fac.setdefault("treaties", []).append(tfid)
+            bot.db["factions"][tfid].setdefault("treaties", []).append(fid)
+            save_data(bot.db)
+            await interaction.response.send_message(f"🕊️ Peace Treaty officially signed between **{fac['display_name']}** and **{bot.db['factions'][tfid]['display_name']}**!")
+        else:
+            await interaction.response.send_message("A treaty is already active.", ephemeral=True)
+    else:
+        if tfid in fac.get("treaties", []):
+            fac["treaties"].remove(tfid)
+            if fid in bot.db["factions"][tfid].get("treaties", []):
+                bot.db["factions"][tfid]["treaties"].remove(fid)
+            save_data(bot.db)
+            await interaction.response.send_message(f"⚠️ Peace Treaty severed with **{bot.db['factions'][tfid]['display_name']}**! Raids are now permitted.")
+        else:
+            await interaction.response.send_message("No active treaty exists to break.", ephemeral=True)
+
 # --- GENERAL ECONOMY PIECES ---
 @bot.tree.command(name="daily", description="Claim your free daily allowance.")
 async def daily(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     now = time.time()
     if now - bot.db["economy"][uid]["last_daily"] >= 86400:
-        bot.db["economy"][uid]["balance"] += 300 # Increased to alleviate scarcity
+        bot.db["economy"][uid]["balance"] += 300
         bot.db["economy"][uid]["last_daily"] = now
         save_data(bot.db)
         await interaction.response.send_message(f"Daily cash claimed! +300 DDR added. Wallet total: {bot.db['economy'][uid]['balance']} DDR.")
@@ -763,7 +1031,6 @@ async def crime(interaction: discord.Interaction):
         
     bot.db["economy"][uid]["last_crime"] = now
     
-    # 45% success chance
     if random.random() < 0.45:
         payout = random.randint(150, 400)
         bot.db["economy"][uid]["balance"] += payout
@@ -787,7 +1054,6 @@ async def beg(interaction: discord.Interaction):
         
     bot.db["economy"][uid]["last_beg"] = now
     
-    # 65% chance someone takes pity on you
     if random.random() < 0.65:
         payout = random.randint(15, 50)
         bot.db["economy"][uid]["balance"] += payout
@@ -826,9 +1092,7 @@ async def rob(interaction: discord.Interaction, target: discord.User):
         
     bot.db["economy"][uid]["last_rob"] = now
     
-    # 45% chance of successful heist
     if random.random() < 0.45:
-        # Steal between 10% and 25% of the target's wallet
         stolen = int(target_bal * random.uniform(0.10, 0.25))
         stolen = max(10, stolen)
         
@@ -839,7 +1103,6 @@ async def rob(interaction: discord.Interaction, target: discord.User):
         new_bal = bot.db["economy"][uid]["balance"]
         await interaction.response.send_message(f"🥷 Sneaky! You robbed {target.mention} and swiped **{stolen} DDR**! (Your Balance: **{new_bal} DDR**)")
     else:
-        # Penalty: Pay a fine of 50 to 120 DDR to the victim
         fine = min(bot.db["economy"][uid]["balance"], random.randint(50, 120))
         bot.db["economy"][uid]["balance"] -= fine
         bot.db["economy"][target_uid]["balance"] += fine
@@ -866,7 +1129,6 @@ async def gift_slash(interaction: discord.Interaction, target: discord.User, amo
     bot.update_balance(target.id, amount)
     await interaction.response.send_message(f"Successfully transferred {amount} DDR to {target.mention}.")
 
-
 @bot.tree.command(name="loan", description="Manage borrowing systems.")
 @app_commands.choices(action=[
     app_commands.Choice(name="Take out a loan", value="take"),
@@ -892,7 +1154,7 @@ async def loan_command(interaction: discord.Interaction, action: app_commands.Ch
         if amount > 1000: return await interaction.response.send_message("Max borrow limit is 1000 DDR.", ephemeral=True)
         
         user_data["loan_amount"] = amount
-        user_data["loan_interest"] = 0.15 # 15% interest flat
+        user_data["loan_interest"] = 0.15
         user_data["loan_due"] = time.time() + 86400
         user_data["balance"] += amount
         save_data(bot.db)
