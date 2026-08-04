@@ -238,7 +238,7 @@ class PackBot(commands.Bot):
         await self.session.close()
         await super().close()
 
-  async def generate_raw(self, prompt, context="FICTIONAL ROAST BATTLE", is_glaze=False):
+    async def generate_raw(self, prompt, context="FICTIONAL ROAST BATTLE", is_glaze=False):
         # Hardcoded Gemini 2.5 Flash model specification
         self.model_id = "models/gemini-2.5-flash"
             
