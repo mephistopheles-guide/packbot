@@ -262,8 +262,14 @@ class PackBot(commands.Bot):
                 generation_config={"temperature": 1.0, "top_p": 0.95},
                 safety_settings=SAFETY_SETTINGS
             )
-            res = await model.generate_content_async(f"{system_instruction}\n\nTARGET/OBJECTIVE: {prompt}")
+            # Added 8-second timeout guard to prevent permanent hanging/thinking states
+            res = await asyncio.wait_for(
+                model.generate_content_async(f"{system_instruction}\n\nTARGET/OBJECTIVE: {prompt}"),
+                timeout=8.0
+            )
             return res.text.strip() if res.text else "API blocked output."
+        except asyncio.TimeoutError:
+            return "API connection timed out. Try again."
         except Exception as e:
             return f"API Error: {str(e)[:50]}"
 
@@ -493,11 +499,11 @@ def build_help_embed(user_id):
         name="⚔️ Military & Factions", 
         value="`/army create <name>` - Found a military regime (1,000 DDR)\n"
               "`/army info [name]` - View military base stats & troops\n"
-              "`/army recruit <unit> <count>` - Recruit Infantry, Tanks, or Artillery\n"
+              "`/army recruit <unit> <count>` - Recruit ground & air forces\n"
               "`/army deposit <amount>` - Fund your regime's treasury\n"
               "`/army doctrine <tactic>` - Set combat strategy (Blitz, Trench, etc.)\n"
-              "`/army rank <user> <role>` - Promote members\n"
-              "`/war raid <target_regime>` - Conduct a raid on enemy base\n"
+              "`/war raid <target_regime>` - Launch ground raid on enemy base\n"
+              "`/war bomb <target_regime>` - Execute strategic airstrike (1h cooldown)\n"
               "`/war treaty <action> <target>` - Propose peace pacts",
         inline=False
     )
@@ -712,15 +718,17 @@ async def stock_set(interaction: discord.Interaction, price: float):
 
 # --- MILITARY & FACTION ENGINE ---
 army_group = app_commands.Group(name="army", description="Manage military regimes and recruited forces.")
-war_group = app_commands.Group(name="war", description="Conduct strategic warfare and base raids.")
+war_group = app_commands.Group(name="war", description="Conduct strategic warfare, bombings, and base raids.")
 bot.tree.add_command(army_group)
 bot.tree.add_command(war_group)
 
 UNIT_STATS = {
-    "infantry": {"cost": 50, "atk": 10, "def": 10, "name": "Infantry Division"},
-    "tanks": {"cost": 250, "atk": 60, "def": 35, "name": "Panzer/Armor Brigade"},
-    "artillery": {"cost": 180, "atk": 45, "def": 20, "name": "Heavy Artillery Battery"},
-    "bunkers": {"cost": 300, "atk": 0, "def": 70, "name": "Fortified Bunkers"}
+    "infantry":  {"cost": 50,  "atk": 12, "def": 15, "name": "🪖 Infantry Division"},
+    "tanks":     {"cost": 250, "atk": 55, "def": 40, "name": "🛡️ Panzer/Armor Brigade"},
+    "artillery": {"cost": 180, "atk": 45, "def": 20, "name": "💥 Heavy Artillery Battery"},
+    "bombers":   {"cost": 350, "atk": 85, "def": 10, "name": "✈️ Luftwaffe/Bomber Squadron"},
+    "flak":      {"cost": 200, "atk": 20, "def": 55, "name": "🎯 Anti-Air Flak Battery"},
+    "bunkers":   {"cost": 300, "atk": 0,  "def": 85, "name": "🏰 Fortified Bunker"}
 }
 
 def get_faction_power(faction_data):
@@ -760,13 +768,19 @@ async def army_create(interaction: discord.Interaction, name: str):
         "treasury": 0,
         "members": {str(interaction.user.id): "Commander"},
         "doctrine": "balanced",
-        "army": {"infantry": 5, "tanks": 0, "artillery": 0, "bunkers": 1},
+        "army": {"infantry": 5, "tanks": 0, "artillery": 0, "bombers": 0, "flak": 0, "bunkers": 1},
         "last_raid": 0,
+        "last_bomb": 0,
         "grace_period": 0,
         "treaties": []
     }
     save_data(bot.db)
-    await interaction.response.send_message(f"🎖️ Military Regime **{name.strip()}** has been founded! You have been appointed **Commander**.")
+    
+    embed = discord.Embed(title="🎖️ NEW MILITARY REGIME FOUNDED", color=0x2ecc71)
+    embed.description = f"**Regime:** {name.strip()}\n**Commander:** {interaction.user.mention}\n\n*Base defenses and starting garrison established. Ready for orders!*"
+    embed.add_field(name="Starting Garrison", value="• 🪖 5x Infantry Divisions\n• 🏰 1x Fortified Bunker", inline=False)
+    embed.set_footer(text="Use /army recruit to expand your forces.")
+    await interaction.response.send_message(embed=embed)
 
 @army_group.command(name="join", description="Join an existing Military Regime.")
 async def army_join(interaction: discord.Interaction, regime_name: str):
@@ -781,7 +795,10 @@ async def army_join(interaction: discord.Interaction, regime_name: str):
     bot.db["economy"][uid]["faction"] = fid
     bot.db["factions"][fid]["members"][str(interaction.user.id)] = "Recruit"
     save_data(bot.db)
-    await interaction.response.send_message(f"Enlisted in **{bot.db['factions'][fid]['display_name']}** as a **Recruit**!")
+    
+    embed = discord.Embed(title="🎖️ ENLISTMENT APPROVED", color=0x3498db)
+    embed.description = f"{interaction.user.mention} has enlisted in **{bot.db['factions'][fid]['display_name']}** as a **Recruit**!"
+    await interaction.response.send_message(embed=embed)
 
 @army_group.command(name="info", description="View military base stats, treasury, and forces.")
 async def army_info(interaction: discord.Interaction, regime_name: str = None):
@@ -795,17 +812,20 @@ async def army_info(interaction: discord.Interaction, regime_name: str = None):
     atk, def_pow = get_faction_power(fac)
     army = fac.get("army", {})
     
-    embed = discord.Embed(title=f"🎖️ Regime Report: {fac['display_name']}", color=0x2b2d31)
-    embed.add_field(name="Leader / Commander", value=f"<@{fac['leader_id']}>", inline=True)
-    embed.add_field(name="War Treasury", value=f"**{fac['treasury']} DDR**", inline=True)
-    embed.add_field(name="Active Doctrine", value=f"`{fac['doctrine'].upper()}`", inline=True)
+    embed = discord.Embed(title=f"🏛️ COMMAND HQ: {fac['display_name'].upper()}", color=0xf1c40f)
+    embed.add_field(name="👤 Supreme Commander", value=f"<@{fac['leader_id']}>", inline=True)
+    embed.add_field(name="💰 War Treasury", value=f"**{fac['treasury']:,} DDR**", inline=True)
+    embed.add_field(name="📜 Doctrine", value=f"`{fac['doctrine'].upper()}`", inline=True)
     
-    embed.add_field(name="⚔️ Combat Power", value=f"Total Attack: **{atk} ATK**\nTotal Defense: **{def_pow} DEF**", inline=False)
+    embed.add_field(
+        name="⚔️ Combined Military Rating", 
+        value=f"```ansi\n\u001b[1;31mOFFENSE (ATK): {atk:,}\u001b[0m\n\u001b[1;34mDEFENSE (DEF): {def_pow:,}\u001b[0m\n```", 
+        inline=False
+    )
     
-    troops_desc = "\n".join([f"• **{UNIT_STATS[u]['name']}**: {army.get(u, 0)}" for u in UNIT_STATS])
-    embed.add_field(name="🪖 Recruited Forces", value=troops_desc, inline=False)
-    embed.add_field(name="👥 Roster Count", value=f"{len(fac['members'])} Active Personnel", inline=True)
-    
+    troops_desc = "\n".join([f"**{UNIT_STATS[u]['name']}**: `{army.get(u, 0):,}`" for u in UNIT_STATS])
+    embed.add_field(name="🎖️ Active Garrison & Fortifications", value=troops_desc or "No forces garrisoned.", inline=False)
+    embed.set_footer(text=f"Total Active Personnel: {len(fac['members'])} Member(s)")
     await interaction.response.send_message(embed=embed)
 
 @army_group.command(name="deposit", description="Deposit DDR from your personal wallet into regime treasury.")
@@ -821,13 +841,19 @@ async def army_deposit(interaction: discord.Interaction, amount: int):
     bot.update_balance(interaction.user.id, -amount)
     bot.db["factions"][fid]["treasury"] += amount
     save_data(bot.db)
-    await interaction.response.send_message(f"Deposited **{amount} DDR** into the war treasury! (Treasury: **{bot.db['factions'][fid]['treasury']} DDR**)")
+    
+    embed = discord.Embed(title="💰 TREASURY DEPOSIT", color=0x2ecc71)
+    embed.description = f"{interaction.user.mention} transferred **{amount:,} DDR** to the war chest."
+    embed.add_field(name="Updated Treasury Balance", value=f"**{bot.db['factions'][fid]['treasury']:,} DDR**")
+    await interaction.response.send_message(embed=embed)
 
-@army_group.command(name="recruit", description="Purchase units for your regime using personal or treasury cash.")
+@army_group.command(name="recruit", description="Purchase ground or air units for your regime.")
 @app_commands.choices(unit=[
     app_commands.Choice(name="Infantry Division (50 DDR)", value="infantry"),
     app_commands.Choice(name="Panzer/Armor Brigade (250 DDR)", value="tanks"),
     app_commands.Choice(name="Heavy Artillery Battery (180 DDR)", value="artillery"),
+    app_commands.Choice(name="Bomber Squadron (350 DDR) [Air Force]", value="bombers"),
+    app_commands.Choice(name="Anti-Air Flak Battery (200 DDR)", value="flak"),
     app_commands.Choice(name="Fortified Bunker (300 DDR)", value="bunkers")
 ])
 async def army_recruit(interaction: discord.Interaction, unit: app_commands.Choice[str], count: int = 1):
@@ -840,12 +866,17 @@ async def army_recruit(interaction: discord.Interaction, unit: app_commands.Choi
     total_cost = UNIT_STATS[unit_key]["cost"] * count
     
     if bot.get_balance(interaction.user.id) < total_cost:
-        return await interaction.response.send_message(f"Recruiting {count}x {UNIT_STATS[unit_key]['name']} costs **{total_cost} DDR**.", ephemeral=True)
+        return await interaction.response.send_message(f"Recruiting `{count}x` {UNIT_STATS[unit_key]['name']} costs **{total_cost:,} DDR**.", ephemeral=True)
         
     bot.update_balance(interaction.user.id, -total_cost)
     bot.db["factions"][fid]["army"][unit_key] = bot.db["factions"][fid]["army"].get(unit_key, 0) + count
     save_data(bot.db)
-    await interaction.response.send_message(f"🪖 Recruited **{count}x {UNIT_STATS[unit_key]['name']}** into the regime's army!")
+    
+    new_total = bot.db["factions"][fid]["army"][unit_key]
+    embed = discord.Embed(title="🪖 REINFORCEMENTS ENLISTED", color=0x2ecc71)
+    embed.description = f"**Unit:** {UNIT_STATS[unit_key]['name']}\n**Quantity:** `+{count}`\n**Cost Paid:** `{total_cost:,} DDR`"
+    embed.add_field(name="Garrison Total", value=f"**{new_total:,}** unit(s) stationed.")
+    await interaction.response.send_message(embed=embed)
 
 @army_group.command(name="doctrine", description="Set military command doctrine (Leader/Generals only).")
 @app_commands.choices(tactic=[
@@ -866,7 +897,10 @@ async def army_doctrine(interaction: discord.Interaction, tactic: app_commands.C
         
     fac["doctrine"] = tactic.value
     save_data(bot.db)
-    await interaction.response.send_message(f"⚔️ Military strategy updated to **{tactic.name}**!")
+    
+    embed = discord.Embed(title="📜 STRATEGIC DOCTRINE CHANGED", color=0xf39c12)
+    embed.description = f"Command Headquarters has shifted to **{tactic.name}**."
+    await interaction.response.send_message(embed=embed)
 
 @war_group.command(name="raid", description="Raid an enemy military base (2h cooldown per regime).")
 async def war_raid(interaction: discord.Interaction, target_regime: str):
@@ -886,9 +920,8 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
     atk_fac = bot.db["factions"][attacker_fid]
     def_fac = bot.db["factions"][defender_fid]
     
-    # Check non-aggression treaties
     if defender_fid in atk_fac.get("treaties", []):
-        return await interaction.response.send_message("You have a active Peace Treaty signed with this regime!", ephemeral=True)
+        return await interaction.response.send_message("You have an active Peace Treaty signed with this regime!", ephemeral=True)
         
     now = time.time()
     if now - atk_fac.get("last_raid", 0) < 7200:
@@ -900,60 +933,119 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
         return await interaction.response.send_message(f"Target is under Post-War Shield Protection! Grace period ends in {left} minutes.", ephemeral=True)
         
     atk_fac["last_raid"] = now
-    
-    # Combat Resolution Calculations
     atk_power, _ = get_faction_power(atk_fac)
     _, def_power = get_faction_power(def_fac)
     
     if atk_power <= 0:
         return await interaction.response.send_message("Your regime has no offensive force! Recruit troops first.", ephemeral=True)
         
-    # Introduce tactical rng variability (+- 15%)
     combat_atk = atk_power * random.uniform(0.85, 1.15)
     combat_def = def_power * random.uniform(0.85, 1.15)
     
     if combat_atk > combat_def:
-        # Attacker Victory
         stolen_ratio = 0.25 if def_fac.get("doctrine") != "scorched" else 0.15
         stolen_cash = int(def_fac["treasury"] * stolen_ratio)
         def_fac["treasury"] -= stolen_cash
         atk_fac["treasury"] += stolen_cash
         
-        # Casualty calculation (Attacker loses up to 10% troops, Defender up to 25%)
         for u in list(def_fac["army"].keys()):
             def_fac["army"][u] = int(def_fac["army"][u] * 0.75)
         for u in list(atk_fac["army"].keys()):
             atk_fac["army"][u] = int(atk_fac["army"][u] * 0.90)
             
-        def_fac["grace_period"] = now + 14400 # 4-hour shield protection after losing raid
+        def_fac["grace_period"] = now + 14400 
         save_data(bot.db)
         
-        embed = discord.Embed(title="💥 RAID VICTORY!", color=0x2ecc71)
-        embed.description = (
-            f"**{atk_fac['display_name']}** successfully breached **{def_fac['display_name']}**'s defense grid!\n\n"
-            f"⚔️ **Attacker Offense:** {int(combat_atk)} ATK\n"
-            f"🛡️ **Defender Defense:** {int(combat_def)} DEF\n"
-            f"💰 **Loot Swiped:** {stolen_cash} DDR from Treasury\n"
-            f"🛡️ Target has gained a 4-hour post-war shield."
-        )
+        embed = discord.Embed(title="💥 BATTLE REPORT: GROUND RAID VICTORY!", color=0x2ecc71)
+        embed.description = f"**{atk_fac['display_name']}** successfully breached **{def_fac['display_name']}**'s defense grid!"
+        embed.add_field(name="⚔️ Attacker Offense", value=f"`{int(combat_atk):,} ATK`", inline=True)
+        embed.add_field(name="🛡️ Defender Defense", value=f"`{int(combat_def):,} DEF`", inline=True)
+        embed.add_field(name="💰 Loot Plundered", value=f"**{stolen_cash:,} DDR**", inline=False)
+        embed.set_footer(text="Target has gained a 4-hour post-war shield.")
         await interaction.response.send_message(embed=embed)
     else:
-        # Defender Defeats Raid
         penalty = min(atk_fac["treasury"], random.randint(100, 300))
         atk_fac["treasury"] -= penalty
         def_fac["treasury"] += penalty
         
-        # Attacker heavy casualties
         for u in list(atk_fac["army"].keys()):
             atk_fac["army"][u] = int(atk_fac["army"][u] * 0.70)
             
         save_data(bot.db)
-        embed = discord.Embed(title="🛡️ RAID REPUDIATED / DEFENDED!", color=0xe74c3c)
+        embed = discord.Embed(title="🛡️ BATTLE REPORT: RAID REPULSED!", color=0xe74c3c)
+        embed.description = f"**{def_fac['display_name']}** held the line and decimated **{atk_fac['display_name']}**'s attacking columns!"
+        embed.add_field(name="⚔️ Attacker Offense", value=f"`{int(combat_atk):,} ATK`", inline=True)
+        embed.add_field(name="🛡️ Defender Defense", value=f"`{int(combat_def):,} DEF`", inline=True)
+        embed.add_field(name="💸 Reparations Paid", value=f"**{penalty:,} DDR** to Defender Treasury", inline=False)
+        await interaction.response.send_message(embed=embed)
+
+@war_group.command(name="bomb", description="Execute an Air Force strategic bombing raid (1h cooldown).")
+async def war_bomb(interaction: discord.Interaction, target_regime: str):
+    uid = bot._init_user(interaction.user.id)
+    attacker_fid = bot.db["economy"][uid]["faction"]
+    
+    if not attacker_fid:
+        return await interaction.response.send_message("You must belong to a military regime to order airstrikes!", ephemeral=True)
+        
+    defender_fid = target_regime.strip().lower()
+    if defender_fid not in bot.db["factions"]:
+        return await interaction.response.send_message("Target regime does not exist.", ephemeral=True)
+        
+    if attacker_fid == defender_fid:
+        return await interaction.response.send_message("You cannot bomb your own territory!", ephemeral=True)
+        
+    atk_fac = bot.db["factions"][attacker_fid]
+    def_fac = bot.db["factions"][defender_fid]
+    
+    if defender_fid in atk_fac.get("treaties", []):
+        return await interaction.response.send_message("You have an active Peace Treaty signed with this regime!", ephemeral=True)
+        
+    if atk_fac["army"].get("bombers", 0) <= 0:
+        return await interaction.response.send_message("No Bomber Squadrons available! Recruit Air Force units first.", ephemeral=True)
+        
+    now = time.time()
+    if now - atk_fac.get("last_bomb", 0) < 3600:
+        left = int((3600 - (now - atk_fac.get("last_bomb", 0))) / 60)
+        return await interaction.response.send_message(f"Your bomber wings are rearming! Wait {left} minutes before bombing again.", ephemeral=True)
+        
+    if now < def_fac.get("grace_period", 0):
+        left = int((def_fac["grace_period"] - now) / 60)
+        return await interaction.response.send_message(f"Target is under Post-War Shield Protection! Grace period ends in {left} minutes.", ephemeral=True)
+        
+    atk_fac["last_bomb"] = now
+    
+    flak_count = def_fac["army"].get("flak", 0)
+    interception_chance = min(0.60, 0.35 + (flak_count * 0.04))
+    
+    if random.random() < interception_chance:
+        lost_bombers = max(1, int(atk_fac["army"].get("bombers", 0) * 0.30))
+        atk_fac["army"]["bombers"] -= lost_bombers
+        save_data(bot.db)
+        
+        embed = discord.Embed(title="✈️ AIR RAID FAILED: SQUADRONS INTERCEPTED!", color=0xe74c3c)
         embed.description = (
-            f"**{def_fac['display_name']}** held the defensive line against **{atk_fac['display_name']}**!\n\n"
-            f"⚔️ **Attacker Offense:** {int(combat_atk)} ATK\n"
-            f"🛡️ **Defender Defense:** {int(combat_def)} DEF\n"
-            f"💸 **War Reparations Paid:** {penalty} DDR to Defender Treasury"
+            f"**{def_fac['display_name']}**'s Anti-Air Flak batteries shot down **{atk_fac['display_name']}**'s incoming bombers!\n\n"
+            f"🎯 **Interception Chance:** `{int(interception_chance * 100)}%`\n"
+            f"💥 **Air Casualties:** `{lost_bombers}x` Bomber Squadron(s) destroyed."
+        )
+        return await interaction.response.send_message(embed=embed)
+    else:
+        bunkers_destroyed = max(1, int(def_fac["army"].get("bunkers", 0) * 0.25))
+        flak_destroyed = int(def_fac["army"].get("flak", 0) * 0.20)
+        
+        def_fac["army"]["bunkers"] = max(0, def_fac["army"].get("bunkers", 0) - bunkers_destroyed)
+        def_fac["army"]["flak"] = max(0, def_fac["army"].get("flak", 0) - flak_destroyed)
+        
+        burn_dmg = min(def_fac["treasury"], random.randint(200, 600))
+        def_fac["treasury"] -= burn_dmg
+        save_data(bot.db)
+        
+        embed = discord.Embed(title="✈️ STRATEGIC BOMBING SUCCESSFUL!", color=0x2ecc71)
+        embed.description = f"**{atk_fac['display_name']}**'s Bomber Squadron devastated **{def_fac['display_name']}**'s defense grid from the air!"
+        embed.add_field(
+            name="🔥 Infrastructure Destroyed", 
+            value=f"• `{bunkers_destroyed}x` Fortified Bunker(s)\n• `{flak_destroyed}x` Flak Battery(s)\n• **{burn_dmg:,} DDR** burnt from Treasury", 
+            inline=False
         )
         await interaction.response.send_message(embed=embed)
 
@@ -980,7 +1072,10 @@ async def war_treaty(interaction: discord.Interaction, action: app_commands.Choi
             fac.setdefault("treaties", []).append(tfid)
             bot.db["factions"][tfid].setdefault("treaties", []).append(fid)
             save_data(bot.db)
-            await interaction.response.send_message(f"🕊️ Peace Treaty officially signed between **{fac['display_name']}** and **{bot.db['factions'][tfid]['display_name']}**!")
+            
+            embed = discord.Embed(title="🕊️ DIPLOMATIC TREATY SIGNED", color=0x3498db)
+            embed.description = f"Non-aggression pact ratified between **{fac['display_name']}** and **{bot.db['factions'][tfid]['display_name']}**."
+            await interaction.response.send_message(embed=embed)
         else:
             await interaction.response.send_message("A treaty is already active.", ephemeral=True)
     else:
@@ -989,7 +1084,10 @@ async def war_treaty(interaction: discord.Interaction, action: app_commands.Choi
             if fid in bot.db["factions"][tfid].get("treaties", []):
                 bot.db["factions"][tfid]["treaties"].remove(fid)
             save_data(bot.db)
-            await interaction.response.send_message(f"⚠️ Peace Treaty severed with **{bot.db['factions'][tfid]['display_name']}**! Raids are now permitted.")
+            
+            embed = discord.Embed(title="⚠️ TREATY SEVERED", color=0xe74c3c)
+            embed.description = f"The peace treaty with **{bot.db['factions'][tfid]['display_name']}** has been broken! All borders open to hostilities."
+            await interaction.response.send_message(embed=embed)
         else:
             await interaction.response.send_message("No active treaty exists to break.", ephemeral=True)
 
@@ -1247,7 +1345,7 @@ async def rr(interaction: discord.Interaction):
     else:
         await interaction.response.send_message(f"⌖ *Click...* {interaction.user.mention} survived the round safely!")
 
-# --- GENERAL AI INTERACTION ROUTINES ---
+# --- GENERAL AI INTERACTION ROUTINES (WITH DEFERRAL & TIMEOUT GUARDS) ---
 @bot.tree.command(name="lawyer", description="Simulate wild courtroom arguments.")
 @app_commands.choices(stance=[
     app_commands.Choice(name="Attack", value="against"),
