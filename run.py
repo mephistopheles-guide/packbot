@@ -186,7 +186,7 @@ class PackBot(commands.Bot):
 
     @tasks.loop(hours=0.5)
     async def update_stock_prices(self):
-        """Fluctuates the Duducoin price every half hour with random crashes/surges and announces it."""
+        """Fluctuates Duducoin dynamically with realistic upside, crashes, surges, and dip-protection."""
         try:
             # Failsafe: Rebuild stock data if a backup wiped it
             if "stocks" not in self.db or "DUDU" not in self.db["stocks"]:
@@ -194,21 +194,26 @@ class PackBot(commands.Bot):
                 
             old_price = self.db["stocks"]["DUDU"]["price"]
             
-            # --- REALISTIC MARKET EVENT ROLLS ---
+            # --- REALISTIC & BALANCED MARKET EVENT ROLLS ---
             event_roll = random.random()
             event_title = "📈 Duducoin Market Update"
             embed_color = 0x2b2d31
             
-            if event_roll < 0.08:  # 8% chance of an unpredictable Market Crash
-                change = random.uniform(-0.40, -0.65)
+            # Dip Recovery: If price drops below 10 DDR, force a bullish bias so it doesn't get trapped at 1.0
+            if old_price < 10.0 and event_roll < 0.45:
+                change = random.uniform(0.20, 0.60)
+                event_title = "🟢 DUDUCOIN DIP RECOVERY! 🟢"
+                embed_color = 0x2ecc71
+            elif event_roll < 0.08:  # 8% chance of an unpredictable Market Crash
+                change = random.uniform(-0.25, -0.45)
                 event_title = "🚨 DUDUCOIN MARKET CRASH! 🚨"
                 embed_color = 0xe74c3c
-            elif event_roll < 0.14:  # 6% chance of a sudden Bull Run
-                change = random.uniform(0.25, 0.50)
+            elif event_roll < 0.18:  # 10% chance of a sudden Bull Surge
+                change = random.uniform(0.35, 0.80)
                 event_title = "🚀 DUDUCOIN BULL SURGE! 🚀"
                 embed_color = 0x2ecc71
-            else:  # Normal market drift (centered near 0 to prevent hyperinflation)
-                change = random.uniform(-0.14, 0.15)
+            else:  # Normal market volatility (-15% to +22% for healthy long-term growth)
+                change = random.uniform(-0.15, 0.22)
                 
             new_price = max(1.0, round(old_price * (1 + change), 2))
 
@@ -267,7 +272,7 @@ class PackBot(commands.Bot):
     async def on_message(self, message):
         if message.author.bot: return
         lower_content = message.content.strip().lower()
-        if any(lower_content.startswith(f"+p {c}") for c in ["help", "downtime", "blacklist", "gift", "leaderboard", "award", "backup", "restore"]):
+        if any(lower_content.startswith(f"+p {c}") for c in ["help", "downtime", "blacklist", "gift", "leaderboard", "award", "backup", "restore", "forcestock", "setstock"]):
             await self.process_commands(message)
             return
 
@@ -501,7 +506,7 @@ def build_help_embed(user_id):
     embed.add_field(name="📈 Stock Market", value="`/stock view` - Check Duducoin market price\n`/stock buy <shares>` - Buy Duducoin stock shares\n`/stock sell <shares>` - Sell your shares back for cash", inline=False)
     embed.add_field(name="🤖 AI Systems", value="`/pack <user>` - Roast someone intensely\n`/glaze <user>` - Hyped praise\n`/lobotomy <user>` - Brainrot custom poetry\n`/lawyer <user> <claim>` - Simulate wild arguments\n`/ask <question>` - Ask the AI anything", inline=False)
     if user_id == MY_ID:
-        embed.add_field(name="⚙️ Admin Settings", value="`/downtime` - Toggle bot AI access\n`/blacklist <user>` - Block user from AI\n`/award <user> <amount>` - Print free cash into existence", inline=False)
+        embed.add_field(name="⚙️ Admin Settings", value="`/downtime` - Toggle bot AI access\n`/blacklist <user>` - Block user from AI\n`/award <user> <amount>` - Print free cash into existence\n`/stock set <price>` - Force set stock price", inline=False)
     return embed
 
 def build_balance_embed(user, balance, loan_amt, loan_due, shares):
@@ -525,6 +530,17 @@ async def forcestock_prefix(ctx):
     if ctx.author.id != MY_ID: return
     await bot.update_stock_prices() 
     await ctx.send("Stock market update forced successfully.")
+
+@bot.command(name="setstock")
+async def setstock_prefix(ctx, price: float):
+    """Owner Only: Manually set the Duducoin market price."""
+    if ctx.author.id != MY_ID: return
+    if price < 1.0:
+        return await ctx.send("Price cannot be set lower than 1.0 DDR.")
+    bot.db["stocks"]["DUDU"]["price"] = round(price, 2)
+    bot.db["stocks"]["DUDU"]["last_update"] = time.time()
+    save_data(bot.db)
+    await ctx.send(f"✅ Duducoin market price manually set to **{round(price, 2)} DDR**.")
 
 @bot.command(name="backup")
 async def backup_prefix(ctx):
@@ -696,6 +712,18 @@ async def stock_sell(interaction: discord.Interaction, shares: int):
     bot.db["economy"][uid]["balance"] += payout
     save_data(bot.db)
     await interaction.response.send_message(f"Sold **{shares}** DUDU shares for **{payout} DDR** cash!")
+
+@stock_group.command(name="set", description="Manually set the Duducoin market price (Owner Only).")
+async def stock_set(interaction: discord.Interaction, price: float):
+    if interaction.user.id != MY_ID:
+        return await interaction.response.send_message("Denied. Owner only.", ephemeral=True)
+    if price < 1.0:
+        return await interaction.response.send_message("Price cannot be set lower than 1.0 DDR.", ephemeral=True)
+    
+    bot.db["stocks"]["DUDU"]["price"] = round(price, 2)
+    bot.db["stocks"]["DUDU"]["last_update"] = time.time()
+    save_data(bot.db)
+    await interaction.response.send_message(f"✅ Duducoin market price manually set to **{round(price, 2)} DDR**.")
 
 # --- GENERAL ECONOMY PIECES ---
 @bot.tree.command(name="daily", description="Claim your free daily allowance.")
