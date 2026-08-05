@@ -88,6 +88,24 @@ DEATH_LINES = [
     "Eliminated."
 ]
 
+SHOP_ITEMS = {
+    "padlock": {
+        "name": "🔒 Padlock",
+        "price": 200,
+        "desc": "1-Time Use. Automatically shatters to block an attempted robbery against your wallet."
+    },
+    "luck_potion": {
+        "name": "🧪 Luck Elixir",
+        "price": 400,
+        "desc": "Grants +1 hour of enhanced luck (higher Crime/Rob odds & +20% bonus casino winnings)."
+    },
+    "crate": {
+        "name": "📦 Mystery Supply Crate",
+        "price": 250,
+        "desc": "Open for a random cash payout between 50 DDR and 600 DDR! Chance to profit or bust."
+    }
+}
+
 class PackBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.all()
@@ -98,7 +116,6 @@ class PackBot(commands.Bot):
         self.hijack_targets = {} 
         self.webhook_cache = {}
         self.session = None
-        self.model_id = None 
         
         self.rr_chamber = []
         self.rr_shots_fired = 0
@@ -118,7 +135,9 @@ class PackBot(commands.Bot):
                 "loan_due": 0,
                 "loan_interest": 0.0,
                 "shares": 0,
-                "faction": None
+                "faction": None,
+                "inventory": {"padlock": 0, "luck_potion": 0, "crate": 0},
+                "luck_expires": 0
             }
         else:
             defaults = {
@@ -128,12 +147,18 @@ class PackBot(commands.Bot):
                 "loan_due": 0, 
                 "loan_interest": 0.0,
                 "shares": 0,
-                "faction": None
+                "faction": None,
+                "inventory": {"padlock": 0, "luck_potion": 0, "crate": 0},
+                "luck_expires": 0
             }
             for k, v in defaults.items():
                 if k not in self.db["economy"][uid]:
                     self.db["economy"][uid][k] = v
         return uid
+
+    def has_luck(self, user_id):
+        uid = self._init_user(user_id)
+        return time.time() < self.db["economy"][uid].get("luck_expires", 0)
 
     def process_overdue_loans(self, user_id):
         uid = self._init_user(user_id)
@@ -167,23 +192,6 @@ class PackBot(commands.Bot):
     async def setup_hook(self):
         self.session = aiohttp.ClientSession()
         await self.tree.sync()
-        print("\n[SYSTEM] Scanning Google AI Studio for accessible models...")
-        try:
-            available_models = [
-                m.name for m in genai.list_models() 
-                if 'generateContent' in m.supported_generation_methods
-            ]
-            if available_models:
-                for m in available_models:
-                    if "flash" in m.lower():
-                        self.model_id = m
-                        break
-                if not self.model_id:
-                    self.model_id = available_models[0]
-                print(f"[SUCCESS] Auto-selected Engine: {self.model_id}")
-        except Exception as e:
-            print(f"[ERROR] AI Auth Failure: {e}")
-            
         self.update_stock_prices.start()
         print(f"--- PACKBOT IS ONLINE ---\n")
 
@@ -239,8 +247,8 @@ class PackBot(commands.Bot):
         await super().close()
 
     async def generate_raw(self, prompt, context="FICTIONAL ROAST BATTLE", is_glaze=False):
-        # Hardcoded Gemini 2.5 Flash model specification
-        self.model_id = "models/gemini-2.5-flash"
+        """Hardcoded to Gemini 2.5 Flash using async generation with a 25s timeout."""
+        model_id = "models/gemini-2.5-flash"
             
         if is_glaze:
             system_instruction = (
@@ -258,20 +266,19 @@ class PackBot(commands.Bot):
 
         try:
             model = genai.GenerativeModel(
-                model_name=self.model_id,
+                model_name=model_id,
                 generation_config={"temperature": 1.0, "top_p": 0.95},
                 safety_settings=SAFETY_SETTINGS
             )
-            # Corrected to use asynchronous generation with an extended 25-second window
             res = await asyncio.wait_for(
                 model.generate_content_async(f"{system_instruction}\n\nTARGET/OBJECTIVE: {prompt}"),
                 timeout=25.0
             )
             return res.text.strip() if res.text else "API blocked output."
         except asyncio.TimeoutError:
-            return "API connection timed out. Try again."
+            return "API connection timed out after 25 seconds. Try again."
         except Exception as e:
-            return f"API Error: {str(e)[:50]}"
+            return f"API Error: {str(e)[:100]}"
 
     async def on_message(self, message):
         if message.author.bot: return
@@ -494,6 +501,14 @@ def build_help_embed(user_id):
               "`/rr` - Play a quick round of Russian Roulette", 
         inline=False
     )
+    embed.add_field(
+        name="🛒 Shop & Inventory",
+        value="`/shop view` - Browse items for sale\n"
+              "`/shop buy <item> [amount]` - Purchase shop items\n"
+              "`/inventory` - View owned items & active Luck duration\n"
+              "`/use <item>` - Drink elixirs or open Mystery Crates",
+        inline=False
+    )
     embed.add_field(name="📈 Stock Market", value="`/stock view` - Check Duducoin market price\n`/stock buy <shares>` - Buy Duducoin stock shares\n`/stock sell <shares>` - Sell your shares back for cash", inline=False)
     embed.add_field(
         name="⚔️ Military & Factions", 
@@ -509,7 +524,7 @@ def build_help_embed(user_id):
     )
     embed.add_field(name="🤖 AI Systems", value="`/pack <user>` - Roast someone intensely\n`/glaze <user>` - Hyped praise\n`/lobotomy <user>` - Brainrot custom poetry\n`/lawyer <user> <claim>` - Simulate wild arguments\n`/ask <question>` - Ask the AI anything", inline=False)
     if user_id == MY_ID:
-        embed.add_field(name="⚙️ Admin Settings", value="`/downtime` - Toggle bot AI access\n`/blacklist <user>` - Block user from AI\n`/award <user> <amount>` - Print free cash into existence\n`/stock set <price>` - Force set stock price", inline=False)
+        embed.add_field(name="⚙️ Admin Settings", value="`/downtime` - Toggle bot AI access\n`/blacklist <user>` - Block user from AI\n`/award <user> <amount>` - Print free cash into existence\n`/stock set <price>` - Force set stock price\n`+p backup` - Get JSON database backup\n`+p restore` - Restore JSON database backup", inline=False)
     return embed
 
 def build_balance_embed(user, balance, loan_amt, loan_due, shares):
@@ -657,6 +672,126 @@ async def blacklist_slash(interaction: discord.Interaction, target: discord.User
     save_data(bot.db)
     await interaction.response.send_message(msg)
 
+# --- SHOP & INVENTORY ENGINE ---
+shop_group = app_commands.Group(name="shop", description="Browse and buy items from the shop.")
+bot.tree.add_command(shop_group)
+
+@shop_group.command(name="view", description="Browse items available for purchase.")
+async def shop_view(interaction: discord.Interaction):
+    embed = discord.Embed(title="🛒 Black Market & Supply Store", color=0x9b59b6)
+    embed.description = "Purchase items to protect your cash, enhance your odds, or gamble on supply crates."
+    
+    for key, item in SHOP_ITEMS.items():
+        embed.add_field(
+            name=f"{item['name']} - **{item['price']} DDR**",
+            value=f"{item['desc']}\n*Buy using `/shop buy item:{key}`*",
+            inline=False
+        )
+    await interaction.response.send_message(embed=embed)
+
+@shop_group.command(name="buy", description="Purchase items from the shop.")
+@app_commands.choices(item=[
+    app_commands.Choice(name="🔒 Padlock (200 DDR - Blocks 1 Robbery)", value="padlock"),
+    app_commands.Choice(name="🧪 Luck Elixir (400 DDR - +1 Hour Luck)", value="luck_potion"),
+    app_commands.Choice(name="📦 Mystery Supply Crate (250 DDR - Random Cash)", value="crate")
+])
+async def shop_buy(interaction: discord.Interaction, item: app_commands.Choice[str], amount: int = 1):
+    if amount <= 0:
+        return await interaction.response.send_message("Amount must be positive.", ephemeral=True)
+        
+    uid = bot._init_user(interaction.user.id)
+    item_key = item.value
+    cost = SHOP_ITEMS[item_key]["price"] * amount
+    
+    if bot.get_balance(interaction.user.id) < cost:
+        return await interaction.response.send_message(
+            f"You can't afford `{amount}x` {SHOP_ITEMS[item_key]['name']}! Total cost is **{cost:,} DDR**.",
+            ephemeral=True
+        )
+        
+    bot.update_balance(interaction.user.id, -cost)
+    bot.db["economy"][uid]["inventory"][item_key] = bot.db["economy"][uid]["inventory"].get(item_key, 0) + amount
+    save_data(bot.db)
+    
+    await interaction.response.send_message(
+        f"✅ Purchased `{amount}x` **{SHOP_ITEMS[item_key]['name']}** for **{cost:,} DDR**!"
+    )
+
+@bot.tree.command(name="inventory", description="View your owned items and active Luck Elixir duration.")
+async def inventory_slash(interaction: discord.Interaction):
+    uid = bot._init_user(interaction.user.id)
+    inv = bot.db["economy"][uid].get("inventory", {})
+    luck_exp = bot.db["economy"][uid].get("luck_expires", 0)
+    
+    embed = discord.Embed(title="🎒 Personal Inventory", color=0x3498db)
+    embed.add_field(name="User", value=interaction.user.mention, inline=True)
+    
+    inv_lines = []
+    for key, item in SHOP_ITEMS.items():
+        qty = inv.get(key, 0)
+        inv_lines.append(f"• **{item['name']}:** `{qty}`")
+        
+    embed.add_field(name="Owned Items", value="\n".join(inv_lines) or "Empty.", inline=False)
+    
+    if time.time() < luck_exp:
+        rem_mins = int((luck_exp - time.time()) / 60)
+        embed.add_field(
+            name="✨ Active Luck Elixir", 
+            value=f"**{rem_mins} minutes** of enhanced luck remaining!", 
+            inline=False
+        )
+    else:
+        embed.add_field(name="✨ Active Luck Elixir", value="No luck effects active.", inline=False)
+        
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="use", description="Use an item from your inventory (Luck Elixirs or Supply Crates).")
+@app_commands.choices(item=[
+    app_commands.Choice(name="🧪 Luck Elixir (+1 Hour Luck)", value="luck_potion"),
+    app_commands.Choice(name="📦 Mystery Supply Crate (Random Cash)", value="crate")
+])
+async def use_slash(interaction: discord.Interaction, item: app_commands.Choice[str]):
+    uid = bot._init_user(interaction.user.id)
+    item_key = item.value
+    inv = bot.db["economy"][uid].setdefault("inventory", {})
+    
+    if inv.get(item_key, 0) <= 0:
+        return await interaction.response.send_message(
+            f"You do not own any **{SHOP_ITEMS[item_key]['name']}**!",
+            ephemeral=True
+        )
+        
+    inv[item_key] -= 1
+    
+    if item_key == "luck_potion":
+        current_exp = bot.db["economy"][uid].get("luck_expires", 0)
+        new_exp = max(time.time(), current_exp) + 3600 # Stacks +1 hour
+        bot.db["economy"][uid]["luck_expires"] = new_exp
+        save_data(bot.db)
+        
+        rem_mins = int((new_exp - time.time()) / 60)
+        embed = discord.Embed(title="🧪 LUCK ELIXIR CONSUMED", color=0x2ecc71)
+        embed.description = (
+            f"You drank a **Luck Elixir**! Your fortune has surged.\n\n"
+            f"• **Duration:** `{rem_mins} minutes` remaining\n"
+            f"• **Crime & Rob Odds:** Increased\n"
+            f"• **Casino Winnings:** `+20% Cash Bonus` active!"
+        )
+        return await interaction.response.send_message(embed=embed)
+        
+    elif item_key == "crate":
+        payout = random.randint(50, 600)
+        bot.db["economy"][uid]["balance"] += payout
+        save_data(bot.db)
+        
+        embed = discord.Embed(title="📦 MYSTERY SUPPLY CRATE OPENED", color=0xf1c40f)
+        embed.description = f"You cracked open the crate and found **{payout:,} DDR** inside!"
+        if payout > 250:
+            embed.set_footer(text="Net Profit: +" + str(payout - 250) + " DDR!")
+        else:
+            embed.set_footer(text="Net Loss: -" + str(250 - payout) + " DDR")
+        return await interaction.response.send_message(embed=embed)
+
 # --- DUDUCOIN STOCK MARKET SCHEDULER ---
 stock_group = app_commands.Group(name="stock", description="Interact with the Duducoin Stock Market.")
 bot.tree.add_command(stock_group)
@@ -716,7 +851,7 @@ async def stock_set(interaction: discord.Interaction, price: float):
     save_data(bot.db)
     await interaction.response.send_message(f"✅ Duducoin market price manually set to **{round(price, 2)} DDR**.")
 
-# --- MILITARY & FACTION ENGINE ---
+# --- MILITARY & FACTION ENGINE (VISUALLY UPGRADED & BALANCED) ---
 army_group = app_commands.Group(name="army", description="Manage military regimes and recruited forces.")
 war_group = app_commands.Group(name="war", description="Conduct strategic warfare, bombings, and base raids.")
 bot.tree.add_command(army_group)
@@ -1129,11 +1264,15 @@ async def crime(interaction: discord.Interaction):
         
     bot.db["economy"][uid]["last_crime"] = now
     
-    if random.random() < 0.45:
+    # Active Luck Elixir boosts success rate from 45% to 65%
+    success_rate = 0.65 if bot.has_luck(uid) else 0.45
+    
+    if random.random() < success_rate:
         payout = random.randint(150, 400)
         bot.db["economy"][uid]["balance"] += payout
         save_data(bot.db)
-        await interaction.response.send_message(f"💸 Success! You pulled off a clean heist and got away with **{payout} DDR**!")
+        luck_msg = " *(Enhanced by Luck Elixir!)*" if bot.has_luck(uid) else ""
+        await interaction.response.send_message(f"💸 Success! You pulled off a clean heist and got away with **{payout} DDR**!{luck_msg}")
     else:
         loss = random.randint(80, 180)
         bot.db["economy"][uid]["balance"] = max(0, bot.db["economy"][uid]["balance"] - loss)
@@ -1190,7 +1329,19 @@ async def rob(interaction: discord.Interaction, target: discord.User):
         
     bot.db["economy"][uid]["last_rob"] = now
     
-    if random.random() < 0.45:
+    # 1. PADLOCK BLOCK CHECK
+    target_inv = bot.db["economy"][target_uid].setdefault("inventory", {})
+    if target_inv.get("padlock", 0) > 0:
+        target_inv["padlock"] -= 1
+        save_data(bot.db)
+        return await interaction.response.send_message(
+            f"🔒 **ROBBERY BLOCKED!** You tried to rob {target.mention}, but their **Padlock** shattered and protected their wallet!"
+        )
+
+    # 2. LUCK ELIXIR BOOST CHECK (Boosts robbery odds from 45% -> 60%)
+    success_rate = 0.60 if bot.has_luck(uid) else 0.45
+    
+    if random.random() < success_rate:
         stolen = int(target_bal * random.uniform(0.10, 0.25))
         stolen = max(10, stolen)
         
@@ -1199,7 +1350,8 @@ async def rob(interaction: discord.Interaction, target: discord.User):
         save_data(bot.db)
         
         new_bal = bot.db["economy"][uid]["balance"]
-        await interaction.response.send_message(f"🥷 Sneaky! You robbed {target.mention} and swiped **{stolen} DDR**! (Your Balance: **{new_bal} DDR**)")
+        luck_msg = " *(Luck Elixir active!)*" if bot.has_luck(uid) else ""
+        await interaction.response.send_message(f"🥷 Sneaky! You robbed {target.mention} and swiped **{stolen} DDR**! (Your Balance: **{new_bal} DDR**){luck_msg}")
     else:
         fine = min(bot.db["economy"][uid]["balance"], random.randint(50, 120))
         bot.db["economy"][uid]["balance"] -= fine
@@ -1284,8 +1436,16 @@ async def coinflip(interaction: discord.Interaction, bet: int, choice: app_comma
     outcome = random.choice(["heads", "tails"])
     
     if choice.value == outcome:
-        bot.update_balance(interaction.user.id, bet * 2)
-        await interaction.response.send_message(f"🎉 It landed on **{outcome.upper()}**! You won **{bet * 2} DDR**!")
+        # Check active luck elixir for +20% extra winnings!
+        payout = bet * 2
+        if bot.has_luck(interaction.user.id):
+            payout = int(payout * 1.20)
+            luck_txt = " *(+20% Luck Elixir Bonus!)*"
+        else:
+            luck_txt = ""
+            
+        bot.update_balance(interaction.user.id, payout)
+        await interaction.response.send_message(f"🎉 It landed on **{outcome.upper()}**! You won **{payout} DDR**!{luck_txt}")
     else:
         await interaction.response.send_message(f"❌ It landed on **{outcome.upper()}**! You lost your bet of **{bet} DDR**.")
 
@@ -1320,6 +1480,9 @@ async def slots(interaction: discord.Interaction, bet: int):
     
     if multiplier > 0:
         winnings = int(bet * multiplier)
+        if bot.has_luck(interaction.user.id):
+            winnings = int(winnings * 1.20) # +20% bonus from Luck Elixir
+            
         bot.update_balance(interaction.user.id, winnings)
         embed.description = f"Winner! Payout: **{winnings} DDR** (x{multiplier})"
         embed.color = 0x2ecc71
@@ -1345,7 +1508,7 @@ async def rr(interaction: discord.Interaction):
     else:
         await interaction.response.send_message(f"⌖ *Click...* {interaction.user.mention} survived the round safely!")
 
-# --- GENERAL AI INTERACTION ROUTINES (WITH DEFERRAL & TIMEOUT GUARDS) ---
+# --- GENERAL AI INTERACTION ROUTINES ---
 @bot.tree.command(name="lawyer", description="Simulate wild courtroom arguments.")
 @app_commands.choices(stance=[
     app_commands.Choice(name="Attack", value="against"),
