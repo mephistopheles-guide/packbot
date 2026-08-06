@@ -467,7 +467,7 @@ class ContractMinigameView(discord.ui.View):
             self.stop()
             for child in self.children: child.disabled = True
             if choice == self.correct_counter:
-                reward = random.randint(150, 350) # NERFED PAYOUT
+                reward = random.randint(500, 1050) # NERFED PAYOUT
                 bot.update_balance(self.user.id, reward)
                 embed = discord.Embed(title="🎯 MERCENARY CONTRACT COMPLETED!", color=0x2ecc71)
                 embed.description = f"You deployed **{choice}** to eliminate the **{self.target_threat}**!\n**Payout:** `+{reward:,} DDR`"
@@ -1732,16 +1732,16 @@ async def smuggle_slash(interaction: discord.Interaction):
     embed.description = f"Contraband worth **{initial_offer:,} DDR** loaded.\n• **Cash Out:** Take **{initial_offer:,} DDR**\n• **Push Checkpoint:** `2x Payout` (40% Bust)\n• **Deep Border Push:** `3x Payout` (65% Bust)"
     await interaction.response.send_message(embed=embed, view=SmuggleMinigameView(interaction.user, initial_offer))
 
-@bot.tree.command(name="salvage", description="Scavenge abandoned war zones for scrap DDR (3m Cooldown - Nerfed).")
+@bot.tree.command(name="salvage", description="Scavenge abandoned war zones for scrap DDR (1m Cooldown - Nerfed).")
 async def salvage_slash(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     now = time.time()
-    if now - bot.db["economy"][uid].get("last_salvage", 0) < 180:
+    if now - bot.db["economy"][uid].get("last_salvage", 0) < 120:
         return await interaction.response.send_message(f"Scrap fields looted! Wait `{int(180-(now-bot.db['economy'][uid].get('last_salvage', 0)))}s`.", ephemeral=True)
     bot.db["economy"][uid]["last_salvage"] = now
     
     if random.random() < 0.85:
-        payout = random.randint(80, 220) # NERFED PAYOUT
+        payout = random.randint(200, 500) # NERFED PAYOUT
         bot.update_balance(interaction.user.id, payout)
         await interaction.response.send_message(f"⚙️ Salvaged **{payout:,} DDR** worth of scrap!")
     else:
