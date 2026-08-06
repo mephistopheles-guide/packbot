@@ -344,7 +344,7 @@ async def global_server_lock(interaction: discord.Interaction) -> bool:
         return False
     return True
 
-# --- INTERACTIVE /WORK MINIGAME VIEW ---
+# --- INTERACTIVE /WORK MINIGAME VIEW (UPDATED TO 100-500 DDR) ---
 class WorkMinigameView(discord.ui.View):
     def __init__(self, user, correct_index, prompt_txt, answers_list):
         super().__init__(timeout=15)
@@ -369,7 +369,8 @@ class WorkMinigameView(discord.ui.View):
                 child.disabled = True
                 
             if idx == self.correct_index:
-                earned = random.randint(800, 1600)
+                # Balanced Payout: 100 to 500 DDR
+                earned = random.randint(100, 500)
                 bot.update_balance(self.user.id, earned)
                 embed = discord.Embed(title="💼 TACTICAL DECRYPTION SUCCESSFUL!", color=0x2ecc71)
                 embed.description = f"You correctly solved the cipher and earned **{earned:,} DDR**!"
@@ -586,9 +587,9 @@ class MultiplayerBlackjackView(discord.ui.View):
 def build_help_embed(user_id):
     embed = discord.Embed(title="Bot Commands menu", color=0x2b2d31, description="Prefix usage: `+p <command>` or use standard Slash Commands.")
     embed.add_field(
-        name="💰 Money & Games (High Payouts!)", 
+        name="💰 Money & Games", 
         value="`/daily` - Claim free daily cash\n"
-              "`/work` - Solve a tactical minigame for big DDR (5m cooldown)\n"
+              "`/work` - Solve a tactical minigame for 100-500 DDR (5m cooldown)\n"
               "`/contract` - Mercenary dispatch challenge (**0 Cooldown**)\n"
               "`/salvage` - Scavenge war scrap metal (**0 Cooldown**)\n"
               "`/crime` - High risk high reward action (10m cooldown)\n"
@@ -1235,13 +1236,12 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
     combat_atk = atk_power * random.uniform(0.85, 1.15)
     combat_def = def_power * random.uniform(0.85, 1.15)
     
-    # Check if defender has 0 troops left or overwhelming attacker advantage -> Total Conquest (100% DDR seizure)
     total_def_troops = sum(def_fac["army"].values())
     is_total_conquest = (total_def_troops == 0 or combat_atk >= combat_def * 2.2)
     
     if combat_atk > combat_def:
         if is_total_conquest:
-            stolen_cash = def_fac["treasury"] # 100% SEIZURE
+            stolen_cash = def_fac["treasury"] 
             def_fac["treasury"] = 0
             title_txt = "👑 DECISIVE TOTAL CONQUEST VICTORY!"
             desc_txt = f"**{atk_fac['display_name']}** completely decimated **{def_fac['display_name']}**'s base and seized **100% OF THEIR WAR TREASURY**!"
@@ -1261,7 +1261,6 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
             
         def_fac["grace_period"] = now + 14400 
         
-        # CLAIM BOUNTY ON ENEMY COMMANDER IF ANY
         bounty_claimed = bot.check_and_claim_bounty(interaction.user.id, def_fac["leader_id"])
         save_data(bot.db)
         
@@ -1446,7 +1445,6 @@ async def war_surrender(interaction: discord.Interaction, target_regime: str):
         
     victor_fac = bot.db["factions"][tfid]
     
-    # SEIZE 100% OF TREASURY & COMMANDER PERSONAL WALLET
     stolen_treasury = fac["treasury"]
     stolen_personal = bot.get_balance(interaction.user.id)
     total_seized = stolen_treasury + stolen_personal
@@ -1476,7 +1474,7 @@ async def daily(interaction: discord.Interaction):
         hours = int((86400 - (now - bot.db["economy"][uid]["last_daily"])) / 3600)
         await interaction.response.send_message(f"Already claimed! Come back in {hours} hours.", ephemeral=True)
 
-@bot.tree.command(name="work", description="Solve a tactical encryption shift for HUGE DDR (5m cooldown).")
+@bot.tree.command(name="work", description="Solve a tactical minigame for 100-500 DDR (5m cooldown).")
 async def work(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     now = time.time()
@@ -1487,7 +1485,6 @@ async def work(interaction: discord.Interaction):
     bot.db["economy"][uid]["last_work"] = now
     save_data(bot.db)
     
-    # 3-Choice Math / Code Cipher Minigame
     a, b = random.randint(11, 45), random.randint(10, 45)
     correct_val = a + b
     answers = [correct_val, correct_val + random.choice([-5, -3, 3, 5]), correct_val + random.choice([-10, -8, 8, 10])]
@@ -1524,7 +1521,6 @@ async def contract_slash(interaction: discord.Interaction):
 async def salvage_slash(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     
-    # 85% chance to find scrap DDR, 15% chance to trigger leftover landmine
     if random.random() < 0.85:
         payout = random.randint(150, 650)
         bot.update_balance(interaction.user.id, payout)
