@@ -153,6 +153,7 @@ class PackBot(commands.Bot):
                 "last_crime": 0,
                 "last_contract": 0,
                 "last_salvage": 0,
+                "last_smuggle": 0,
                 "loan_amount": 0,
                 "loan_due": 0,
                 "loan_interest": 0.0,
@@ -168,6 +169,7 @@ class PackBot(commands.Bot):
                 "last_crime": 0,
                 "last_contract": 0,
                 "last_salvage": 0,
+                "last_smuggle": 0,
                 "loan_amount": 0, 
                 "loan_due": 0, 
                 "loan_interest": 0.0,
@@ -448,7 +450,7 @@ class CrimeHeistView(discord.ui.View):
             await interaction.response.edit_message(embed=embed, view=self)
         return callback
 
-# --- CONTRACT MINIGAME VIEW (NERFED + COOLDOWN CAPPED) ---
+# --- CONTRACT MINIGAME VIEW ---
 class ContractMinigameView(discord.ui.View):
     def __init__(self, user, target_threat, correct_counter, options_list):
         super().__init__(timeout=15)
@@ -467,7 +469,7 @@ class ContractMinigameView(discord.ui.View):
             self.stop()
             for child in self.children: child.disabled = True
             if choice == self.correct_counter:
-                reward = random.randint(500, 1050) # NERFED PAYOUT
+                reward = random.randint(150, 350)
                 bot.update_balance(self.user.id, reward)
                 embed = discord.Embed(title="🎯 MERCENARY CONTRACT COMPLETED!", color=0x2ecc71)
                 embed.description = f"You deployed **{choice}** to eliminate the **{self.target_threat}**!\n**Payout:** `+{reward:,} DDR`"
@@ -666,9 +668,9 @@ def build_help_embed(user_id):
         value="`/daily` - Claim free daily cash (**1,000 DDR**)\n"
               "`/work` - Solve a tactical minigame for 100-500 DDR (5m cd)\n"
               "`/crime` - Interactive Heist Target minigame (High Payouts! 10m cd)\n"
-              "`/contract` - Mercenary dispatch challenge (**5m Cooldown - Nerfed**)\n"
-              "`/salvage` - Scavenge war scrap metal (**3m Cooldown - Nerfed**)\n"
-              "`/smuggle` - Push-your-luck contraband transport (**0 Cooldown**)\n"
+              "`/contract` - Mercenary dispatch challenge (**5m Cooldown**)\n"
+              "`/salvage` - Scavenge war scrap metal (**3m Cooldown**)\n"
+              "`/smuggle` - Push-your-luck contraband transport (**2m Cooldown**)\n"
               "`/beg` - Ask around for pocket change (**0 Cooldown**)\n"
               "`/rob <user>` - Petty theft attempt (3% cap / max 300 DDR - 15m cd)\n"
               "`/balance` - Check your wallet & loans\n"
@@ -697,11 +699,11 @@ def build_help_embed(user_id):
               "`/army recruit <unit> <count>` - Recruit ground & air forces\n"
               "`/army deposit <amount>` - Fund treasury (Immune to /rob + earns interest!)\n"
               "`/army withdraw <amount>` - Withdraw DDR from treasury to wallet\n"
-              "`/army doctrine <tactic>` - Set strategy (Blitzkrieg, Trench, Deep Battle, etc.)\n"
+              "`/army doctrine <tactic>` - Set strategy (Blitzkrieg, Trench, Air Supremacy, etc.)\n"
               "`/war pledge <axis | allies | neutral>` - Join a Global Coalition\n"
               "`/war world_status` - View global power balance (Axis vs. Allies)\n"
-              "`/war raid <target>` - Launch a realistic 3-Phase Multi-Domain Assault\n"
-              "`/war bomb <target>` - Execute strategic airstrike (1h cd)\n"
+              "`/war raid <target>` - Launch a 3-Phase Combined Assault (**5m Cooldown**)\n"
+              "`/war bomb <target>` - Execute dogfight & airstrike (**50m Cooldown**)\n"
               "`/war spy <target>` - Uncover exact enemy numbers for 2 hours\n"
               "`/war propaganda <target>` - Siphon 10% enemy treasury via desertion (2h cd)\n"
               "`/war ceasefire <target>` - Propose/Accept a temporary 3-hour ceasefire\n"
@@ -719,7 +721,7 @@ def build_help_embed(user_id):
               "`/shop view` - Browse items for sale\n"
               "`/shop buy <item> [amount]` - Purchase shop items\n"
               "`/inventory` - View owned items & active Luck duration\n"
-              "`/use <item>` - Drink elixirs, use decryption keys, or open Crates",
+              "`/use <item> [amount]` - Bulk use Elixirs, Decryption Keys, or Crates",
         inline=False
     )
     embed.add_field(name="🤖 AI Systems", value="`/pack <user>` - Roast someone intensely\n`/glaze <user>` - Hyped praise\n`/lobotomy <user>` - Brainrot custom poetry\n`/lawyer <user> <claim>` - Simulate wild arguments\n`/ask <question>` - Ask the AI anything", inline=False)
@@ -1029,37 +1031,48 @@ async def inventory_slash(interaction: discord.Interaction):
     else: embed.add_field(name="✨ Active Luck Elixir", value="No luck effects active.", inline=False)
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="use", description="Use an item from your inventory.")
+@bot.tree.command(name="use", description="Bulk use items from your inventory (Elixirs, Decryption Keys, or Crates).")
 @app_commands.choices(item=[
-    app_commands.Choice(name="🧪 Luck Elixir (+1 Hour Luck)", value="luck_potion"),
-    app_commands.Choice(name="📦 Mystery Supply Crate", value="crate"),
+    app_commands.Choice(name="🧪 Luck Elixir (+1 Hour Luck per Elixir)", value="luck_potion"),
+    app_commands.Choice(name="📦 Mystery Supply Crate (Random Cash)", value="crate"),
     app_commands.Choice(name="💻 Cyber Decryption Key (Instant 500 DDR Hack)", value="hack_tool")
 ])
-async def use_slash(interaction: discord.Interaction, item: app_commands.Choice[str]):
+async def use_slash(interaction: discord.Interaction, item: app_commands.Choice[str], amount: int = 1):
+    if amount <= 0: return await interaction.response.send_message("Amount must be positive.", ephemeral=True)
     uid = bot._init_user(interaction.user.id)
     item_key = item.value
     inv = bot.db["economy"][uid].setdefault("inventory", {})
-    if inv.get(item_key, 0) <= 0: return await interaction.response.send_message(f"You do not own any **{SHOP_ITEMS[item_key]['name']}**!", ephemeral=True)
-    inv[item_key] -= 1
+    if inv.get(item_key, 0) < amount:
+        return await interaction.response.send_message(f"You do not own `{amount}x` **{SHOP_ITEMS[item_key]['name']}**! (Owned: `{inv.get(item_key, 0)}`)", ephemeral=True)
+        
+    inv[item_key] -= amount
+    
     if item_key == "luck_potion":
-        new_exp = max(time.time(), bot.db["economy"][uid].get("luck_expires", 0)) + 3600
+        current_exp = bot.db["economy"][uid].get("luck_expires", 0)
+        new_exp = max(time.time(), current_exp) + (3600 * amount)
         bot.db["economy"][uid]["luck_expires"] = new_exp
         save_data(bot.db)
-        embed = discord.Embed(title="🧪 LUCK ELIXIR CONSUMED", color=0x2ecc71)
-        embed.description = f"Drank a **Luck Elixir**! `{int((new_exp - time.time()) / 60)} minutes` remaining (-15% crime bust / +20% casino bonus)."
+        embed = discord.Embed(title="🧪 LUCK ELIXIRS CONSUMED", color=0x2ecc71)
+        embed.description = f"Drank `{amount}x` **Luck Elixir**!\n• **Total Duration:** `{int((new_exp - time.time()) / 60)} minutes` remaining\n• **Buffs:** -15% Crime Bust Odds / +20% Casino Bonus"
         return await interaction.response.send_message(embed=embed)
+        
     elif item_key == "crate":
-        payout = random.randint(50, 420)
-        bot.db["economy"][uid]["balance"] += payout
+        total_payout = sum(random.randint(50, 420) for _ in range(amount))
+        bot.db["economy"][uid]["balance"] += total_payout
         save_data(bot.db)
-        embed = discord.Embed(title="📦 MYSTERY SUPPLY CRATE OPENED", color=0xf1c40f)
-        embed.description = f"Found **{payout:,} DDR** inside!"
+        net_profit = total_payout - (250 * amount)
+        embed = discord.Embed(title=f"📦 {amount}x MYSTERY SUPPLY CRATES OPENED", color=0xf1c40f)
+        embed.description = f"You cracked open `{amount}x` crates and bagged a combined **{total_payout:,} DDR** inside!"
+        if net_profit >= 0: embed.set_footer(text=f"Net Profit: +{net_profit:,} DDR!")
+        else: embed.set_footer(text=f"Net Loss: {net_profit:,} DDR")
         return await interaction.response.send_message(embed=embed)
+        
     elif item_key == "hack_tool":
-        bot.db["economy"][uid]["balance"] += 500
+        total_hack = 500 * amount
+        bot.db["economy"][uid]["balance"] += total_hack
         save_data(bot.db)
-        embed = discord.Embed(title="💻 CYBER TERMINAL CRACKED", color=0x2ecc71)
-        embed.description = "Used the **Cyber Decryption Key** to siphon a guaranteed **500 DDR**!"
+        embed = discord.Embed(title=f"💻 {amount}x CYBER TERMINALS CRACKED", color=0x2ecc71)
+        embed.description = f"Used `{amount}x` **Cyber Decryption Keys** to siphon a guaranteed **{total_hack:,} DDR**!"
         return await interaction.response.send_message(embed=embed)
 
 # --- STOCK MARKET ---
@@ -1116,7 +1129,7 @@ UNIT_STATS = {
     "infantry":  {"cost": 50,  "atk": 12, "def": 15, "name": "🪖 Infantry Division"},
     "tanks":     {"cost": 250, "atk": 55, "def": 40, "name": "🛡️ Panzer/Armor Brigade"},
     "artillery": {"cost": 180, "atk": 45, "def": 20, "name": "💥 Heavy Artillery Battery"},
-    "bombers":   {"cost": 350, "atk": 85, "def": 10, "name": "✈️ Luftwaffe/Bomber Squadron"},
+    "bombers":   {"cost": 350, "atk": 85, "def": 45, "name": "✈️ Luftwaffe/Bomber Squadron"},
     "flak":      {"cost": 200, "atk": 20, "def": 55, "name": "🎯 Anti-Air Flak Battery"},
     "bunkers":   {"cost": 300, "atk": 0,  "def": 85, "name": "🏰 Fortified Bunker"}
 }
@@ -1136,9 +1149,10 @@ def get_faction_power(faction_data):
     elif doctrine == "trench":
         total_def = int(total_def * 1.40)
         total_atk = int(total_atk * 0.75)
-        
-    # Deep Battle Coalition Synergy Buff (+20% stats if pledged to Axis or Allies)
-    if doctrine == "deep_battle" and faction_data.get("alignment") in ["axis", "allies"]:
+    elif doctrine == "air_supremacy":
+        total_atk = int(total_atk * 1.25)
+        total_def = int(total_def * 1.15)
+    elif doctrine == "deep_battle" and faction_data.get("alignment") in ["axis", "allies"]:
         total_atk = int(total_atk * 1.20)
         total_def = int(total_def * 1.20)
         
@@ -1203,7 +1217,6 @@ async def army_info(interaction: discord.Interaction, regime_name: str = None, t
     atk, def_pow = get_faction_power(fac)
     army = fac.get("army", {})
     
-    # FOG OF WAR INTEL CHECK: Can we see exact numbers?
     is_ally = (my_fid == fid) or (my_fid and fid in bot.db["factions"][my_fid].get("treaties", []))
     has_spy_report = False
     if my_fid and my_fid in bot.db["intel_dossiers"] and fid in bot.db["intel_dossiers"][my_fid]:
@@ -1363,8 +1376,8 @@ async def war_world_status(interaction: discord.Interaction):
     )
     await interaction.response.send_message(embed=embed)
 
-# --- 3-PHASE MULTI-DOMAIN RAID ENGINE ---
-@war_group.command(name="raid", description="Launch a realistic 3-Phase Multi-Domain Assault on an enemy regime.")
+# --- 3-PHASE MULTI-DOMAIN RAID ENGINE (WITH BOMBER DOGFIGHTS & AIR COUNTER-ATTACKS) ---
+@war_group.command(name="raid", description="Launch a realistic 3-Phase Multi-Domain Assault (5m Cooldown).")
 async def war_raid(interaction: discord.Interaction, target_regime: str):
     uid = bot._init_user(interaction.user.id)
     attacker_fid = bot.db["economy"][uid]["faction"]
@@ -1385,32 +1398,51 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
         return await interaction.response.send_message("A temporary Ceasefire is currently blocking hostilities!", ephemeral=True)
         
     now = time.time()
-    if now - atk_fac.get("last_raid", 0) < 7200:
-        return await interaction.response.send_message(f"Troops are re-supplying! Wait `{int((7200-(now-atk_fac.get('last_raid',0)))/60)}m`.", ephemeral=True)
+    if now - atk_fac.get("last_raid", 0) < 300: # 5 MINUTES COOLDOWN
+        return await interaction.response.send_message(f"Frontline assault columns reloading! Wait `{int(300-(now-atk_fac.get('last_raid',0)))}s`.", ephemeral=True)
     if now < def_fac.get("grace_period", 0):
         return await interaction.response.send_message(f"Target has Post-War Shield Protection for `{int((def_fac['grace_period']-now)/60)}m`.", ephemeral=True)
         
     atk_fac["last_raid"] = now
     atk_army, def_army = atk_fac["army"], def_fac["army"]
     
-    # --- PHASE I: AIR SUPERIORITY ---
+    # --- PHASE I: AIR CONTEST (BOMBER DOGFIGHTS & COUNTER-ATTACKS) ---
     air_atk = atk_army.get("bombers", 0) * UNIT_STATS["bombers"]["atk"]
-    air_def = def_army.get("flak", 0) * UNIT_STATS["flak"]["def"]
+    air_def_flak = def_army.get("flak", 0) * UNIT_STATS["flak"]["def"]
+    air_def_bombers = def_army.get("bombers", 0) * UNIT_STATS["bombers"]["atk"] # Bombers scramble to intercept!
+    air_def_total = air_def_flak + air_def_bombers
     phase1_report = ""
-    if air_atk > air_def and air_atk > 0:
+    
+    if air_atk > air_def_total and air_atk > 0:
         bunker_kills = max(1, int(def_army.get("bunkers", 0) * 0.20))
         def_army["bunkers"] = max(0, def_army.get("bunkers", 0) - bunker_kills)
-        phase1_report = f"✈️ **Attacker Air Superiority:** Bombers bypassed Flak and destroyed `{bunker_kills}x` Bunkers!"
-    else:
-        bomber_losses = max(1, int(atk_army.get("bombers", 0) * 0.25)) if atk_army.get("bombers", 0) > 0 else 0
+        phase1_report = f"✈️ **Attacker Air Superiority:** Luftwaffe bypassed Flak/interceptors and destroyed `{bunker_kills}x` Bunkers!"
+    elif air_def_total > air_atk and air_def_total > 0:
+        bomber_losses = max(1, int(atk_army.get("bombers", 0) * 0.30)) if atk_army.get("bombers", 0) > 0 else 0
         atk_army["bombers"] = max(0, atk_army.get("bombers", 0) - bomber_losses)
-        phase1_report = f"🎯 **Defender Air Contested:** Anti-Air Flak shot down `{bomber_losses}x` Attacker Bombers!"
         
-    # --- PHASE II: ARTILLERY BARRAGE ---
+        # DEFENDER BOMBER AERIAL COUNTER-STRIKE!
+        if def_army.get("bombers", 0) > 0:
+            atk_bunker_dmg = max(1, int(atk_army.get("bunkers", 0) * 0.15))
+            atk_army["bunkers"] = max(0, atk_army.get("bunkers", 0) - atk_bunker_dmg)
+            phase1_report = f"🛩️ **Defender Dogfight Counter-Attack:** Defender Bombers & Flak shot down `{bomber_losses}x` Attacker Bombers and counter-bombed `{atk_bunker_dmg}x` Attacker Bunkers!"
+        else:
+            phase1_report = f"🎯 **Defender Air Superiority:** Anti-Air Flak shot down `{bomber_losses}x` Attacker Bombers!"
+    else:
+        phase1_report = "☁️ **Air Neutral:** Neither side achieved clear air dominance."
+        
+    # --- PHASE II: ARTILLERY BARRAGE (COUNTER-BATTERY DUELS) ---
     art_atk = atk_army.get("artillery", 0) * UNIT_STATS["artillery"]["atk"]
-    inf_kills = max(0, int((art_atk * 0.05) / 12))
-    def_army["infantry"] = max(0, def_army.get("infantry", 0) - inf_kills)
-    phase2_report = f"💥 **Artillery Barrage:** Heavy bombardment neutralized `{inf_kills}x` Defender Infantry!"
+    art_def = def_army.get("artillery", 0) * UNIT_STATS["artillery"]["atk"]
+    phase2_report = ""
+    if art_atk > art_def:
+        inf_kills = max(0, int(((art_atk - art_def) * 0.06) / 12))
+        def_army["infantry"] = max(0, def_army.get("infantry", 0) - inf_kills)
+        phase2_report = f"💥 **Attacker Barrage:** Heavy artillery duel won! Suppressed `{inf_kills}x` Defender Infantry."
+    else:
+        inf_kills = max(0, int(((art_def - art_atk) * 0.06) / 12))
+        atk_army["infantry"] = max(0, atk_army.get("infantry", 0) - inf_kills)
+        phase2_report = f"🛡️ **Defender Counter-Battery:** Defender Artillery fire halted the advance! Slain `{inf_kills}x` Attacker Infantry."
     
     # --- PHASE III: GROUND & MECHANIZED CLASH ---
     atk_power, _ = get_faction_power(atk_fac)
@@ -1438,11 +1470,11 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
         bounty_claimed = bot.check_and_claim_bounty(interaction.user.id, def_fac["leader_id"])
         save_data(bot.db)
         
-        embed = discord.Embed(title="💥 BATTLE REPORT: DECISIVE RAID VICTORY!", color=0x2ecc71)
-        embed.description = f"**{atk_fac['display_name']}** breached **{def_fac['display_name']}**'s defenses!"
-        embed.add_field(name="Phase I (Air)", value=phase1_report, inline=False)
-        embed.add_field(name="Phase II (Artillery)", value=phase2_report, inline=False)
-        embed.add_field(name="Phase III (Ground Assault)", value=f"`ATK: {int(combat_atk):,}` vs `DEF: {int(combat_def):,}`\n**Loot Seized:** `{stolen_cash:,} DDR`{burn_msg}", inline=False)
+        embed = discord.Embed(title="💥 BATTLE REPORT: DECISIVE FRONT BREAKTHROUGH!", color=0x2ecc71)
+        embed.description = f"**{atk_fac['display_name']}** shattered **{def_fac['display_name']}**'s line!"
+        embed.add_field(name="Phase I (Air Superiority)", value=phase1_report, inline=False)
+        embed.add_field(name="Phase II (Artillery Duel)", value=phase2_report, inline=False)
+        embed.add_field(name="Phase III (Ground Advance)", value=f"`ATK: {int(combat_atk):,}` vs `DEF: {int(combat_def):,}`\n**Loot Seized:** `{stolen_cash:,} DDR`{burn_msg}", inline=False)
         if bounty_claimed > 0: embed.add_field(name="🎯 HIT CLAIMED!", value=f"Collected **{bounty_claimed:,} DDR** bounty on enemy Commander!", inline=False)
         await interaction.response.send_message(embed=embed)
     else:
@@ -1455,12 +1487,12 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
         
         embed = discord.Embed(title="🛡️ BATTLE REPORT: RAID REPULSED!", color=0xe74c3c)
         embed.description = f"**{def_fac['display_name']}** held the line against **{atk_fac['display_name']}**!"
-        embed.add_field(name="Phase I (Air)", value=phase1_report, inline=False)
-        embed.add_field(name="Phase II (Artillery)", value=phase2_report, inline=False)
-        embed.add_field(name="Phase III (Ground Assault)", value=f"`ATK: {int(combat_atk):,}` vs `DEF: {int(combat_def):,}`\n**Reparations Paid:** `{penalty:,} DDR` to Defender", inline=False)
+        embed.add_field(name="Phase I (Air Superiority)", value=phase1_report, inline=False)
+        embed.add_field(name="Phase II (Artillery Duel)", value=phase2_report, inline=False)
+        embed.add_field(name="Phase III (Ground Advance)", value=f"`ATK: {int(combat_atk):,}` vs `DEF: {int(combat_def):,}`\n**Reparations Paid:** `{penalty:,} DDR` to Defender", inline=False)
         await interaction.response.send_message(embed=embed)
 
-@war_group.command(name="bomb", description="Execute an Air Force strategic bombing raid (1h cooldown).")
+@war_group.command(name="bomb", description="Execute an Air Force dogfight & airstrike (50m Cooldown).")
 async def war_bomb(interaction: discord.Interaction, target_regime: str):
     uid = bot._init_user(interaction.user.id)
     attacker_fid = bot.db["economy"][uid]["faction"]
@@ -1473,17 +1505,33 @@ async def war_bomb(interaction: discord.Interaction, target_regime: str):
         return await interaction.response.send_message("Cannot bomb an allied coalition member!", ephemeral=True)
     if atk_fac["army"].get("bombers", 0) <= 0: return await interaction.response.send_message("No Bomber Squadrons available!", ephemeral=True)
     now = time.time()
-    if now - atk_fac.get("last_bomb", 0) < 3600: return await interaction.response.send_message("Bombers rearming!", ephemeral=True)
+    
+    # 50 MINUTES (3000s) COOLDOWN
+    if now - atk_fac.get("last_bomb", 0) < 3000:
+        return await interaction.response.send_message(f"Airfields refueling! Wait `{int((3000-(now-atk_fac.get('last_bomb',0)))/60)}m`.", ephemeral=True)
     if now < def_fac.get("grace_period", 0): return await interaction.response.send_message("Target has Shield Protection!", ephemeral=True)
     atk_fac["last_bomb"] = now
+    
+    # DEFENDER AERIAL INTERCEPTION (FLAK + DEFENDER BOMBERS DEFENDING/COUNTER-ATTACKING!)
     flak_count = def_fac["army"].get("flak", 0)
-    interception_chance = min(0.60, 0.35 + (flak_count * 0.04))
+    def_bomber_count = def_fac["army"].get("bombers", 0)
+    interception_chance = min(0.75, 0.25 + (flak_count * 0.04) + (def_bomber_count * 0.05))
+    
     if random.random() < interception_chance:
-        lost_bombers = max(1, int(atk_fac["army"].get("bombers", 0) * 0.30))
+        lost_bombers = max(1, int(atk_fac["army"].get("bombers", 0) * 0.35))
         atk_fac["army"]["bombers"] -= lost_bombers
+        
+        # DEFENDER COUNTER-ATTACK!
+        if def_bomber_count > 0:
+            counter_burn = min(atk_fac["treasury"], random.randint(150, 450))
+            atk_fac["treasury"] -= counter_burn
+            counter_txt = f"\n🛩️ **Aerial Counter-Strike:** Defender Bombers counter-attacked and burnt **{counter_burn:,} DDR** from your Treasury!"
+        else:
+            counter_txt = ""
+            
         save_data(bot.db)
-        embed = discord.Embed(title="✈️ AIR RAID FAILED: SQUADRONS INTERCEPTED!", color=0xe74c3c)
-        embed.description = f"**{def_fac['display_name']}**'s Flak batteries shot down `{lost_bombers}x` Bombers!"
+        embed = discord.Embed(title="✈️ AIR RAID INTERCEPTED IN DOGFIGHT!", color=0xe74c3c)
+        embed.description = f"**{def_fac['display_name']}** scrambled interceptors and Flak batteries, shooting down `{lost_bombers}x` of your Bombers!{counter_txt}"
         return await interaction.response.send_message(embed=embed)
     else:
         bunkers_destroyed = max(1, int(def_fac["army"].get("bunkers", 0) * 0.25))
@@ -1493,11 +1541,11 @@ async def war_bomb(interaction: discord.Interaction, target_regime: str):
         burn_dmg = min(def_fac["treasury"], random.randint(200, 600))
         def_fac["treasury"] -= burn_dmg
         save_data(bot.db)
-        embed = discord.Embed(title="✈️ STRATEGIC BOMBING SUCCESSFUL!", color=0x2ecc71)
+        embed = discord.Embed(title="✈️ STRATEGIC AIRSTRIKE SUCCESSFUL!", color=0x2ecc71)
         embed.description = f"**{atk_fac['display_name']}** devastated **{def_fac['display_name']}**'s defense grid!\n• `{bunkers_destroyed}x` Bunkers & `{flak_destroyed}x` Flak destroyed\n• **{burn_dmg:,} DDR** burnt from Treasury"
         await interaction.response.send_message(embed=embed)
 
-@war_group.command(name="spy", description="Send a covert operative to reveal exact enemy numbers for 2 hours (Overcomes Fog of War).")
+@war_group.command(name="spy", description="Send a covert operative to reveal exact enemy numbers for 2 hours.")
 async def war_spy(interaction: discord.Interaction, target_regime: str):
     uid = bot._init_user(interaction.user.id)
     attacker_fid = bot.db["economy"][uid]["faction"]
@@ -1508,12 +1556,9 @@ async def war_spy(interaction: discord.Interaction, target_regime: str):
         
     atk_fac, def_fac = bot.db["factions"][attacker_fid], bot.db["factions"][defender_fid]
     
-    # 75% spy success
     if random.random() < 0.75:
-        # Unlock intel dossier for 2 hours (7200s)
         bot.db["intel_dossiers"].setdefault(attacker_fid, {})[defender_fid] = time.time() + 7200
         save_data(bot.db)
-        
         army = def_fac.get("army", {})
         troops_txt = "\n".join([f"• **{UNIT_STATS[u]['name']}:** `{army.get(u,0):,}`" for u in UNIT_STATS])
         embed = discord.Embed(title=f"🕵️ CLANDESTINE INTEL DOSSIER: {def_fac['display_name'].upper()}", color=0x3498db)
@@ -1725,23 +1770,30 @@ async def contract_slash(interaction: discord.Interaction):
     embed.description = f"An enemy **{target_threat}** is approaching! Choose the correct counter-unit below:"
     await interaction.response.send_message(embed=embed, view=ContractMinigameView(interaction.user, target_threat, correct, all_options))
 
-@bot.tree.command(name="smuggle", description="Push-your-luck contraband transport for instant DDR (0 COOLDOWN).")
+@bot.tree.command(name="smuggle", description="Push-your-luck contraband transport for instant DDR (2m Cooldown - Nerfed).")
 async def smuggle_slash(interaction: discord.Interaction):
+    uid = bot._init_user(interaction.user.id)
+    now = time.time()
+    if now - bot.db["economy"][uid].get("last_smuggle", 0) < 120:
+        return await interaction.response.send_message(f"Border checkpoints on alert! Wait `{int(120-(now-bot.db['economy'][uid].get('last_smuggle', 0)))}s` before smuggling again.", ephemeral=True)
+    bot.db["economy"][uid]["last_smuggle"] = now
+    save_data(bot.db)
+    
     initial_offer = random.randint(300, 600)
     embed = discord.Embed(title="📦 UNDERGROUND CONTRABAND TRANSPORT", color=0xe67e22)
     embed.description = f"Contraband worth **{initial_offer:,} DDR** loaded.\n• **Cash Out:** Take **{initial_offer:,} DDR**\n• **Push Checkpoint:** `2x Payout` (40% Bust)\n• **Deep Border Push:** `3x Payout` (65% Bust)"
     await interaction.response.send_message(embed=embed, view=SmuggleMinigameView(interaction.user, initial_offer))
 
-@bot.tree.command(name="salvage", description="Scavenge abandoned war zones for scrap DDR (1m Cooldown - Nerfed).")
+@bot.tree.command(name="salvage", description="Scavenge abandoned war zones for scrap DDR (3m Cooldown - Nerfed).")
 async def salvage_slash(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     now = time.time()
-    if now - bot.db["economy"][uid].get("last_salvage", 0) < 120:
+    if now - bot.db["economy"][uid].get("last_salvage", 0) < 180:
         return await interaction.response.send_message(f"Scrap fields looted! Wait `{int(180-(now-bot.db['economy'][uid].get('last_salvage', 0)))}s`.", ephemeral=True)
     bot.db["economy"][uid]["last_salvage"] = now
     
     if random.random() < 0.85:
-        payout = random.randint(200, 500) # NERFED PAYOUT
+        payout = random.randint(80, 220)
         bot.update_balance(interaction.user.id, payout)
         await interaction.response.send_message(f"⚙️ Salvaged **{payout:,} DDR** worth of scrap!")
     else:
