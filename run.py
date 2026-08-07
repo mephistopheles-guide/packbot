@@ -119,7 +119,7 @@ SHOP_ITEMS = {
     "hack_tool": {
         "name": "💻 Cyber Decryption Key",
         "price": 300,
-        "desc": "Use via /use hack_tool to instantly crack a secure terminal for a guaranteed 500 DDR payout."
+        "desc": "Use via /use hack_tool to hack a terminal. (20% risk: lose 10% bank & 10% treasury if caught!)"
     },
     "signet_ring": {
         "name": "💍 Mafia Signet Ring",
@@ -152,8 +152,8 @@ class PackBot(commands.Bot):
                 "last_work": 0,
                 "last_crime": 0,
                 "last_contract": 0,
-                "last_salvage": 0,
                 "last_smuggle": 0,
+                "last_extort": 0,
                 "loan_amount": 0,
                 "loan_due": 0,
                 "loan_interest": 0.0,
@@ -168,8 +168,8 @@ class PackBot(commands.Bot):
                 "last_work": 0,
                 "last_crime": 0,
                 "last_contract": 0,
-                "last_salvage": 0,
                 "last_smuggle": 0,
+                "last_extort": 0,
                 "loan_amount": 0, 
                 "loan_due": 0, 
                 "loan_interest": 0.0,
@@ -263,17 +263,28 @@ class PackBot(commands.Bot):
             self.db["stocks"]["DUDU"]["price"] = new_price
             self.db["stocks"]["DUDU"]["last_update"] = time.time()
 
-            # TREASURY INTEREST YIELD (+1.5% compound interest per 30 mins)
+            # TREASURY INTEREST & INDUSTRIAL FACTORY PRODUCTION LOOP
             for fid, fac in self.db["factions"].items():
                 if fac.get("treasury", 0) > 0:
                     interest = int(fac["treasury"] * 0.015)
                     fac["treasury"] += max(1, interest)
+                
+                # Industry yields
+                industries = fac.get("industries", {"factory": 0, "steel_mill": 0, "arms_plant": 0})
+                fac_income = industries.get("factory", 0) * 120
+                if fac_income > 0:
+                    fac["treasury"] += fac_income
+                
+                # Arms plant automatic unit manufacture
+                arms_plants = industries.get("arms_plant", 0)
+                if arms_plants > 0 and random.random() < 0.5:
+                    fac["army"]["infantry"] = fac["army"].get("infantry", 0) + (arms_plants * 2)
 
             save_data(self.db)
             channel = self.get_channel(self.STOCK_CHANNEL_ID)
             if channel:
                 embed = discord.Embed(title=event_title, color=embed_color)
-                embed.description = f"The stock price has updated!\n\n**New Price:** {new_price} DDR\n**Change:** {change:+.2%}\n\n*All active Military Treasuries also earned +1.5% interest!*"
+                embed.description = f"The stock price has updated!\n\n**New Price:** {new_price} DDR\n**Change:** {change:+.2%}\n\n*All active Military Treasuries & Industrial Plants yielded production bonuses!*"
                 await channel.send(embed=embed)
         except Exception as e:
             print(f"[ERROR] Market/Treasury Loop Failed: {e}")
@@ -664,19 +675,16 @@ class MultiplayerBlackjackView(discord.ui.View):
 def build_help_embed(user_id):
     embed = discord.Embed(title="Bot Commands menu", color=0x2b2d31, description="Prefix usage: `+p <command>` or use standard Slash Commands.")
     embed.add_field(
-        name="💰 Money & Games", 
+        name="💰 Sustainable Money & Games", 
         value="`/daily` - Claim free daily cash (**1,000 DDR**)\n"
               "`/work` - Solve a tactical minigame for 100-500 DDR (5m cd)\n"
               "`/crime` - Interactive Heist Target minigame (High Payouts! 10m cd)\n"
-              "`/contract` - Mercenary dispatch challenge (**5m Cooldown**)\n"
-              "`/salvage` - Scavenge war scrap metal (**3m Cooldown**)\n"
+              "`/contract` - Mercenary dispatch challenge (5m cd)\n"
               "`/smuggle` - Push-your-luck contraband transport (**2m Cooldown**)\n"
-              "`/beg` - Ask around for pocket change (**0 Cooldown**)\n"
               "`/rob <user>` - Petty theft attempt (3% cap / max 300 DDR - 15m cd)\n"
               "`/balance` - Check your wallet & loans\n"
               "`/gift <user> <amount>` - Send cash to a friend\n"
               "`/leaderboard` - See richest users\n"
-              "`/loan <action>` - Borrow or repay cash\n"
               "`/coinflip <bet> <side>` - Flip for double or nothing\n"
               "`/blackjack <bet>` - Open a multiplayer card table\n"
               "`/slots <bet>` - Play high-stakes slots\n"
@@ -687,23 +695,25 @@ def build_help_embed(user_id):
         name="🕴️ Mafia Syndicate",
         value="`/mafia create <name>` - Found your own Mafia Family (2,500 DDR)\n"
               "`/mafia join <name>` - Join an existing Family\n"
-              "`/mafia extort` - Shakedown local shops for cash (**0 Cooldown**)\n"
+              "`/mafia extort` - Shakedown local shops for cash (**1m Cooldown**)\n"
               "`/mafia hitman <target>` - Send a hitman to injure a rival (1,000 DDR)\n"
               "`/mafia info [name]` - View Family prestige & treasury",
         inline=False
     )
     embed.add_field(
-        name="🌍 World War & Factions", 
+        name="🌍 World War, Industry & Cities", 
         value="`/army create <name>` - Found a military regime (1,000 DDR)\n"
               "`/army info [name] [user]` - View base stats (Enemies require `/war spy` for exact numbers!)\n"
               "`/army recruit <unit> <count>` - Recruit ground & air forces\n"
-              "`/army deposit <amount>` - Fund treasury (Immune to /rob + earns interest!)\n"
+              "`/army deposit <amount>` - Fund treasury (Earns 1.5% interest + immune to /rob!)\n"
               "`/army withdraw <amount>` - Withdraw DDR from treasury to wallet\n"
               "`/army doctrine <tactic>` - Set strategy (Blitzkrieg, Trench, Air Supremacy, etc.)\n"
+              "`/industry build <type>` - Build Consumer Factories, Steel Mills, or Arms Plants\n"
+              "`/city found <name>` - Found a major urban City (Cost: 10,000 DDR)\n"
               "`/war pledge <axis | allies | neutral>` - Join a Global Coalition\n"
               "`/war world_status` - View global power balance (Axis vs. Allies)\n"
-              "`/war raid <target>` - Launch a 3-Phase Combined Assault (**5m Cooldown**)\n"
-              "`/war bomb <target>` - Execute dogfight & airstrike (**50m Cooldown**)\n"
+              "`/war raid <target>` - Launch a 3-Phase Combined Assault (5m Cooldown / No Shields)\n"
+              "`/war bomb <target>` - Execute dogfight & airstrike (50m Cooldown)\n"
               "`/war spy <target>` - Uncover exact enemy numbers for 2 hours\n"
               "`/war propaganda <target>` - Siphon 10% enemy treasury via desertion (2h cd)\n"
               "`/war ceasefire <target>` - Propose/Accept a temporary 3-hour ceasefire\n"
@@ -721,7 +731,7 @@ def build_help_embed(user_id):
               "`/shop view` - Browse items for sale\n"
               "`/shop buy <item> [amount]` - Purchase shop items\n"
               "`/inventory` - View owned items & active Luck duration\n"
-              "`/use <item> [amount]` - Bulk use Elixirs, Decryption Keys, or Crates",
+              "`/use <item> [amount]` - Bulk use Elixirs, Crates, or Hack Tools (**20% Risk on Hacks!**)",
         inline=False
     )
     embed.add_field(name="🤖 AI Systems", value="`/pack <user>` - Roast someone intensely\n`/glaze <user>` - Hyped praise\n`/lobotomy <user>` - Brainrot custom poetry\n`/lawyer <user> <claim>` - Simulate wild arguments\n`/ask <question>` - Ask the AI anything", inline=False)
@@ -746,7 +756,7 @@ def build_balance_embed(user, balance, loan_amt, loan_due, shares):
 async def forcestock_prefix(ctx):
     if ctx.author.id != MY_ID: return
     await bot.update_market_and_treasury() 
-    await ctx.send("Stock market & Treasury interest cycle forced successfully.")
+    await ctx.send("Stock market, Treasury interest & Industrial production loops forced successfully.")
 
 @bot.command(name="setstock")
 async def setstock_prefix(ctx, price: float):
@@ -844,7 +854,6 @@ async def leaderboard_slash(interaction: discord.Interaction):
     embed.add_field(name="📈 Top Shareholders (DUDU)", value="\n".join(stock_lines) or "Empty.", inline=True)
     await interaction.response.send_message(embed=embed)
 
-# --- SLASH COMMAND ADMINISTRATIVE INTERFACES ---
 @bot.tree.command(name="help", description="View lists of all working commands.")
 async def help_slash(interaction: discord.Interaction):
     await interaction.response.send_message(embed=build_help_embed(interaction.user.id))
@@ -905,13 +914,20 @@ async def mafia_join(interaction: discord.Interaction, family_name: str):
     embed.description = f"{interaction.user.mention} joined **{bot.db['mafia'][fam_id]['display_name']}** as an **Associate**."
     await interaction.response.send_message(embed=embed)
 
-@mafia_group.command(name="extort", description="Shakedown local storefronts for protection money (0 COOLDOWN).")
+@mafia_group.command(name="extort", description="Shakedown local shops for protection money (1 Minute Cooldown).")
 async def mafia_extort(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
-    fam_id = bot.db["economy"][uid].get("mafia_family")
+    now = time.time()
+    user_eco = bot.db["economy"][uid]
+    if now - user_eco.get("last_extort", 0) < 60:
+        return await interaction.response.send_message(f"Local shops are locked down! Wait `{int(60-(now-user_eco.get('last_extort',0)))}s` before extorting again.", ephemeral=True)
+    
+    fam_id = user_eco.get("mafia_family")
     if not fam_id or fam_id not in bot.db["mafia"]: return await interaction.response.send_message("You must belong to a Family!", ephemeral=True)
+    user_eco["last_extort"] = now
+    
     fam = bot.db["mafia"][fam_id]
-    user_inv = bot.db["economy"][uid].get("inventory", {})
+    user_inv = user_eco.get("inventory", {})
     if random.random() < 0.85:
         base_payout = random.randint(150, 450)
         if user_inv.get("signet_ring", 0) > 0:
@@ -924,7 +940,7 @@ async def mafia_extort(interaction: discord.Interaction):
         await interaction.response.send_message(f"🕴️ You collected **{base_payout:,} DDR** in protection money!{ring_txt}")
     else:
         fine = random.randint(100, 300)
-        bot.db["economy"][uid]["balance"] = max(0, bot.db["economy"][uid]["balance"] - fine)
+        user_eco["balance"] = max(0, user_eco["balance"] - fine)
         save_data(bot.db)
         await interaction.response.send_message(f"🚨 Detectives busted your shakedown and fined you **{fine:,} DDR**.")
 
@@ -1031,11 +1047,11 @@ async def inventory_slash(interaction: discord.Interaction):
     else: embed.add_field(name="✨ Active Luck Elixir", value="No luck effects active.", inline=False)
     await interaction.response.send_message(embed=embed)
 
-@bot.tree.command(name="use", description="Bulk use items from your inventory (Elixirs, Decryption Keys, or Crates).")
+@bot.tree.command(name="use", description="Bulk use items from your inventory (Elixirs, Crates, or Cyber Hack Tools).")
 @app_commands.choices(item=[
     app_commands.Choice(name="🧪 Luck Elixir (+1 Hour Luck per Elixir)", value="luck_potion"),
     app_commands.Choice(name="📦 Mystery Supply Crate (Random Cash)", value="crate"),
-    app_commands.Choice(name="💻 Cyber Decryption Key (Instant 500 DDR Hack)", value="hack_tool")
+    app_commands.Choice(name="💻 Cyber Decryption Key (20% Risk: Lose 10% Bank & 10% Treasury if caught)", value="hack_tool")
 ])
 async def use_slash(interaction: discord.Interaction, item: app_commands.Choice[str], amount: int = 1):
     if amount <= 0: return await interaction.response.send_message("Amount must be positive.", ephemeral=True)
@@ -1068,11 +1084,33 @@ async def use_slash(interaction: discord.Interaction, item: app_commands.Choice[
         return await interaction.response.send_message(embed=embed)
         
     elif item_key == "hack_tool":
-        total_hack = 500 * amount
-        bot.db["economy"][uid]["balance"] += total_hack
+        caught_count = 0
+        success_count = 0
+        for _ in range(amount):
+            if random.random() < 0.20: caught_count += 1
+            else: success_count += 1
+            
+        total_earned = success_count * 500
+        bot.db["economy"][uid]["balance"] += total_earned
+        
+        penalty_msg = ""
+        if caught_count > 0:
+            user_eco = bot.db["economy"][uid]
+            bank_loss = int(user_eco["balance"] * 0.10 * caught_count)
+            user_eco["balance"] = max(0, user_eco["balance"] - bank_loss)
+            
+            treasury_loss = 0
+            fid = user_eco.get("faction")
+            if fid and fid in bot.db["factions"]:
+                fac = bot.db["factions"][fid]
+                treasury_loss = int(fac["treasury"] * 0.10 * caught_count)
+                fac["treasury"] = max(0, fac["treasury"] - treasury_loss)
+                
+            penalty_msg = f"\n🚨 **CYBER TRACE DETECTED!** You were caught `{caught_count}x` out of `{amount}` attempts!\n• **Bank Wallet Lost:** `-{bank_loss:,} DDR` (10%)\n• **Military Treasury Lost:** `-{treasury_loss:,} DDR` (10%)"
+            
         save_data(bot.db)
-        embed = discord.Embed(title=f"💻 {amount}x CYBER TERMINALS CRACKED", color=0x2ecc71)
-        embed.description = f"Used `{amount}x` **Cyber Decryption Keys** to siphon a guaranteed **{total_hack:,} DDR**!"
+        embed = discord.Embed(title=f"💻 {amount}x CYBER TERMINAL HACKS EXECUTED", color=0xe74c3c if caught_count > 0 else 0x2ecc71)
+        embed.description = f"• **Successful Hacks:** `{success_count}` (`+{total_earned:,} DDR`)\n• **Caught By Cybersecurity:** `{caught_count}`{penalty_msg}"
         return await interaction.response.send_message(embed=embed)
 
 # --- STOCK MARKET ---
@@ -1119,11 +1157,13 @@ async def stock_set(interaction: discord.Interaction, price: float):
     save_data(bot.db)
     await interaction.response.send_message(f"✅ Duducoin market price set to **{round(price, 2)} DDR**.")
 
-# --- MILITARY, COALITION & FACTION ENGINE ---
+# --- MILITARY, COALITION & INDUSTRIAL ENGINE ---
 army_group = app_commands.Group(name="army", description="Manage military regimes and recruited forces.")
 war_group = app_commands.Group(name="war", description="Conduct strategic warfare, bombings, and base raids.")
+industry_group = app_commands.Group(name="industry", description="Manage factories, mills, and urban cities.")
 bot.tree.add_command(army_group)
 bot.tree.add_command(war_group)
+bot.tree.add_command(industry_group)
 
 UNIT_STATS = {
     "infantry":  {"cost": 50,  "atk": 12, "def": 15, "name": "🪖 Infantry Division"},
@@ -1134,11 +1174,22 @@ UNIT_STATS = {
     "bunkers":   {"cost": 300, "atk": 0,  "def": 85, "name": "🏰 Fortified Bunker"}
 }
 
+INDUSTRY_TYPES = {
+    "factory": {"name": "🏭 Consumer Factory", "cost": 1500, "desc": "Generates steady hourly cash flow into the Treasury."},
+    "steel_mill": {"name": "⚙️ Steel Mill", "cost": 3500, "desc": "Produces raw materials needed for heavy military armor."},
+    "arms_plant": {"name": "🔫 Arms Manufacturing Plant", "cost": 6000, "desc": "Automatically manufactures free Infantry units over time."}
+}
+
 def get_faction_power(faction_data):
     army = faction_data.get("army", {})
     total_atk = sum(army.get(u, 0) * UNIT_STATS[u]["atk"] for u in UNIT_STATS)
     total_def = sum(army.get(u, 0) * UNIT_STATS[u]["def"] for u in UNIT_STATS)
     
+    # City defense bonus (+15% defense if cities are founded)
+    cities = faction_data.get("cities", [])
+    if len(cities) > 0:
+        total_def = int(total_def * (1 + (0.15 * len(cities))))
+
     if faction_data.get("treasury", 0) >= 10000:
         total_def = int(total_def * 1.10)
 
@@ -1175,10 +1226,11 @@ async def army_create(interaction: discord.Interaction, name: str):
         "members": {str(interaction.user.id): "Commander"},
         "doctrine": "balanced",
         "army": {"infantry": 5, "tanks": 0, "artillery": 0, "bombers": 0, "flak": 0, "bunkers": 1},
+        "industries": {"factory": 0, "steel_mill": 0, "arms_plant": 0},
+        "cities": [],
         "last_raid": 0,
         "last_bomb": 0,
         "last_propaganda": 0,
-        "grace_period": 0,
         "ceasefires": {},
         "treaties": [],
         "enemies": []
@@ -1216,6 +1268,8 @@ async def army_info(interaction: discord.Interaction, regime_name: str = None, t
     fac = bot.db["factions"][fid]
     atk, def_pow = get_faction_power(fac)
     army = fac.get("army", {})
+    industries = fac.get("industries", {})
+    cities = fac.get("cities", [])
     
     is_ally = (my_fid == fid) or (my_fid and fid in bot.db["factions"][my_fid].get("treaties", []))
     has_spy_report = False
@@ -1227,10 +1281,13 @@ async def army_info(interaction: discord.Interaction, regime_name: str = None, t
     embed = discord.Embed(title=f"🏛️ COMMAND HQ: {fac['display_name'].upper()}", color=0xf1c40f)
     embed.add_field(name="👤 Supreme Commander", value=f"<@{fac['leader_id']}>", inline=True)
     embed.add_field(name="🌍 Global Alignment", value=f"`{fac.get('alignment', 'neutral').upper()}`", inline=True)
+    embed.add_field(name="🏙️ Controlled Cities", value=f"{len(cities)} City/Cities (`{', '.join(cities) if cities else 'None'}`)", inline=False)
     
     if show_exact:
         embed.add_field(name="💰 War Treasury", value=f"**{fac['treasury']:,} DDR**", inline=True)
         embed.add_field(name="📜 Doctrine", value=f"`{fac['doctrine'].upper()}`", inline=True)
+        ind_desc = f"• Factories: `{industries.get('factory', 0)}`\n• Steel Mills: `{industries.get('steel_mill', 0)}`\n• Arms Plants: `{industries.get('arms_plant', 0)}`"
+        embed.add_field(name="🏭 Industrial Infrastructure", value=ind_desc, inline=False)
         embed.add_field(
             name="⚔️ Combined Military Rating", 
             value=f"```ansi\n\u001b[1;31mOFFENSE (ATK): {atk:,}\u001b[0m\n\u001b[1;34mDEFENSE (DEF): {def_pow:,}\u001b[0m\n```", 
@@ -1326,6 +1383,50 @@ async def army_doctrine(interaction: discord.Interaction, tactic: app_commands.C
     save_data(bot.db)
     await interaction.response.send_message(f"📜 Strategic doctrine shifted to **{tactic.name}**.")
 
+# --- INDUSTRY & CITIES ENGINE ---
+@industry_group.command(name="build", description="Build Consumer Factories, Steel Mills, or Arms Plants.")
+@app_commands.choices(building=[
+    app_commands.Choice(name="Consumer Factory (1,500 DDR) [Generates Cash]", value="factory"),
+    app_commands.Choice(name="Steel Mill (3,500 DDR) [Heavy Materials]", value="steel_mill"),
+    app_commands.Choice(name="Arms Plant (6,000 DDR) [Free Infantry Yield]", value="arms_plant")
+])
+async def industry_build(interaction: discord.Interaction, building: app_commands.Choice[str]):
+    uid = bot._init_user(interaction.user.id)
+    fid = bot.db["economy"][uid]["faction"]
+    if not fid: return await interaction.response.send_message("Enlist in a regime first.", ephemeral=True)
+    fac = bot.db["factions"][fid]
+    if fac["leader_id"] != str(interaction.user.id): return await interaction.response.send_message("Commander only!", ephemeral=True)
+    
+    b_key = building.value
+    cost = INDUSTRY_TYPES[b_key]["cost"]
+    if bot.get_balance(interaction.user.id) < cost:
+        return await interaction.response.send_message(f"Can't afford **{INDUSTRY_TYPES[b_key]['name']}**! Costs `{cost:,} DDR`.", ephemeral=True)
+        
+    bot.update_balance(interaction.user.id, -cost)
+    fac.setdefault("industries", {"factory": 0, "steel_mill": 0, "arms_plant": 0})
+    fac["industries"][b_key] += 1
+    save_data(bot.db)
+    await interaction.response.send_message(f"🏭 Successfully constructed **{INDUSTRY_TYPES[b_key]['name']}** for `{cost:,} DDR`!")
+
+@industry_group.command(name="found", description="Found a major urban City for your regime (Cost: 10,000 DDR).")
+async def city_found(interaction: discord.Interaction, name: str):
+    uid = bot._init_user(interaction.user.id)
+    fid = bot.db["economy"][uid]["faction"]
+    if not fid: return await interaction.response.send_message("Enlist in a regime first.", ephemeral=True)
+    fac = bot.db["factions"][fid]
+    if fac["leader_id"] != str(interaction.user.id): return await interaction.response.send_message("Commander only!", ephemeral=True)
+    
+    c_name = name.strip()
+    if c_name in fac.get("cities", []): return await interaction.response.send_message("City name already exists in your regime!", ephemeral=True)
+    if bot.get_balance(interaction.user.id) < 10000: return.await interaction.response.send_message("Founding a City requires **10,000 DDR** capital.", ephemeral=True) if False else await interaction.response.send_message("Founding a City requires **10,000 DDR** capital.", ephemeral=True)
+    
+    bot.update_balance(interaction.user.id, -10000)
+    fac.setdefault("cities", []).append(c_name)
+    save_data(bot.db)
+    embed = discord.Embed(title="🏙️ NEW METROPOLITAN CITY FOUNDED", color=0x3498db)
+    embed.description = f"**{fac['display_name']}** successfully established the urban center of **{c_name}**!\n• **Benefits:** +15% Defensive Combat Bonus per city & expanded territorial prestige."
+    await interaction.response.send_message(embed=embed)
+
 # --- WORLD WAR COALITION COMMANDS ---
 @war_group.command(name="pledge", description="Pledge your regime to the Axis, Allies, or Neutral coalition (Commander Only).")
 @app_commands.choices(alignment=[
@@ -1376,7 +1477,7 @@ async def war_world_status(interaction: discord.Interaction):
     )
     await interaction.response.send_message(embed=embed)
 
-# --- 3-PHASE MULTI-DOMAIN RAID ENGINE (WITH BOMBER DOGFIGHTS & AIR COUNTER-ATTACKS) ---
+# --- 3-PHASE MULTI-DOMAIN RAID ENGINE (NO SHIELDS) ---
 @war_group.command(name="raid", description="Launch a realistic 3-Phase Multi-Domain Assault (5m Cooldown).")
 async def war_raid(interaction: discord.Interaction, target_regime: str):
     uid = bot._init_user(interaction.user.id)
@@ -1400,16 +1501,14 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
     now = time.time()
     if now - atk_fac.get("last_raid", 0) < 300: # 5 MINUTES COOLDOWN
         return await interaction.response.send_message(f"Frontline assault columns reloading! Wait `{int(300-(now-atk_fac.get('last_raid',0)))}s`.", ephemeral=True)
-    if now < def_fac.get("grace_period", 0):
-        return await interaction.response.send_message(f"Target has Post-War Shield Protection for `{int((def_fac['grace_period']-now)/60)}m`.", ephemeral=True)
         
     atk_fac["last_raid"] = now
-    atk_army, def_army = atk_fac["army"], def_fac["army"]
+    atk_army, def_army = atk_fac["army"], def_army["army"]
     
-    # --- PHASE I: AIR CONTEST (BOMBER DOGFIGHTS & COUNTER-ATTACKS) ---
+    # --- PHASE I: AIR CONTEST ---
     air_atk = atk_army.get("bombers", 0) * UNIT_STATS["bombers"]["atk"]
     air_def_flak = def_army.get("flak", 0) * UNIT_STATS["flak"]["def"]
-    air_def_bombers = def_army.get("bombers", 0) * UNIT_STATS["bombers"]["atk"] # Bombers scramble to intercept!
+    air_def_bombers = def_army.get("bombers", 0) * UNIT_STATS["bombers"]["atk"]
     air_def_total = air_def_flak + air_def_bombers
     phase1_report = ""
     
@@ -1420,8 +1519,6 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
     elif air_def_total > air_atk and air_def_total > 0:
         bomber_losses = max(1, int(atk_army.get("bombers", 0) * 0.30)) if atk_army.get("bombers", 0) > 0 else 0
         atk_army["bombers"] = max(0, atk_army.get("bombers", 0) - bomber_losses)
-        
-        # DEFENDER BOMBER AERIAL COUNTER-STRIKE!
         if def_army.get("bombers", 0) > 0:
             atk_bunker_dmg = max(1, int(atk_army.get("bunkers", 0) * 0.15))
             atk_army["bunkers"] = max(0, atk_army.get("bunkers", 0) - atk_bunker_dmg)
@@ -1431,7 +1528,7 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
     else:
         phase1_report = "☁️ **Air Neutral:** Neither side achieved clear air dominance."
         
-    # --- PHASE II: ARTILLERY BARRAGE (COUNTER-BATTERY DUELS) ---
+    # --- PHASE II: ARTILLERY BARRAGE ---
     art_atk = atk_army.get("artillery", 0) * UNIT_STATS["artillery"]["atk"]
     art_def = def_army.get("artillery", 0) * UNIT_STATS["artillery"]["atk"]
     phase2_report = ""
@@ -1460,9 +1557,7 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
         
         def_fac["treasury"] -= stolen_cash
         atk_fac["treasury"] += stolen_cash
-        def_fac["grace_period"] = now + 14400
         
-        # Ground losses
         def_army["tanks"] = int(def_army.get("tanks", 0) * 0.70)
         def_army["infantry"] = int(def_army.get("infantry", 0) * 0.65)
         atk_army["infantry"] = int(atk_army.get("infantry", 0) * 0.85)
@@ -1506,13 +1601,10 @@ async def war_bomb(interaction: discord.Interaction, target_regime: str):
     if atk_fac["army"].get("bombers", 0) <= 0: return await interaction.response.send_message("No Bomber Squadrons available!", ephemeral=True)
     now = time.time()
     
-    # 50 MINUTES (3000s) COOLDOWN
     if now - atk_fac.get("last_bomb", 0) < 3000:
         return await interaction.response.send_message(f"Airfields refueling! Wait `{int((3000-(now-atk_fac.get('last_bomb',0)))/60)}m`.", ephemeral=True)
-    if now < def_fac.get("grace_period", 0): return await interaction.response.send_message("Target has Shield Protection!", ephemeral=True)
     atk_fac["last_bomb"] = now
     
-    # DEFENDER AERIAL INTERCEPTION (FLAK + DEFENDER BOMBERS DEFENDING/COUNTER-ATTACKING!)
     flak_count = def_fac["army"].get("flak", 0)
     def_bomber_count = def_fac["army"].get("bombers", 0)
     interception_chance = min(0.75, 0.25 + (flak_count * 0.04) + (def_bomber_count * 0.05))
@@ -1520,8 +1612,6 @@ async def war_bomb(interaction: discord.Interaction, target_regime: str):
     if random.random() < interception_chance:
         lost_bombers = max(1, int(atk_fac["army"].get("bombers", 0) * 0.35))
         atk_fac["army"]["bombers"] -= lost_bombers
-        
-        # DEFENDER COUNTER-ATTACK!
         if def_bomber_count > 0:
             counter_burn = min(atk_fac["treasury"], random.randint(150, 450))
             atk_fac["treasury"] -= counter_burn
@@ -1606,7 +1696,7 @@ async def war_ceasefire(interaction: discord.Interaction, target_regime: str):
     tfid = target_regime.strip().lower()
     if tfid not in bot.db["factions"] or tfid == fid: return await interaction.response.send_message("Invalid target regime.", ephemeral=True)
     
-    fac.setdefault("ceasefires", {})[tfid] = time.time() + 10800 # 3 hours
+    fac.setdefault("ceasefires", {})[tfid] = time.time() + 10800
     bot.db["factions"][tfid].setdefault("ceasefires", {})[fid] = time.time() + 10800
     save_data(bot.db)
     embed = discord.Embed(title="🕊️ 3-HOUR CEASEFIRE RATIFIED", color=0x3498db)
@@ -1746,7 +1836,7 @@ async def crime(interaction: discord.Interaction):
     embed.description = "Choose your tier below!\n• **ATM Smash:** `500-1,000 DDR` (20% Bust)\n• **Armored Truck:** `1,500-3,800 DDR` (45% Bust)\n• **Central Bank:** `5,000-12,000 DDR` (70% Bust)\n• **Gold Reserve:** `15,000-35,000 DDR` (85% Bust)"
     await interaction.response.send_message(embed=embed, view=CrimeHeistView(interaction.user))
 
-@bot.tree.command(name="contract", description="Deploy a mercenary unit counter (5m Cooldown - Nerfed).")
+@bot.tree.command(name="contract", description="Deploy a mercenary unit counter (5m Cooldown).")
 async def contract_slash(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     now = time.time()
@@ -1770,7 +1860,7 @@ async def contract_slash(interaction: discord.Interaction):
     embed.description = f"An enemy **{target_threat}** is approaching! Choose the correct counter-unit below:"
     await interaction.response.send_message(embed=embed, view=ContractMinigameView(interaction.user, target_threat, correct, all_options))
 
-@bot.tree.command(name="smuggle", description="Push-your-luck contraband transport for instant DDR (2m Cooldown - Nerfed).")
+@bot.tree.command(name="smuggle", description="Push-your-luck contraband transport for instant DDR (2m Cooldown).")
 async def smuggle_slash(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     now = time.time()
@@ -1783,37 +1873,6 @@ async def smuggle_slash(interaction: discord.Interaction):
     embed = discord.Embed(title="📦 UNDERGROUND CONTRABAND TRANSPORT", color=0xe67e22)
     embed.description = f"Contraband worth **{initial_offer:,} DDR** loaded.\n• **Cash Out:** Take **{initial_offer:,} DDR**\n• **Push Checkpoint:** `2x Payout` (40% Bust)\n• **Deep Border Push:** `3x Payout` (65% Bust)"
     await interaction.response.send_message(embed=embed, view=SmuggleMinigameView(interaction.user, initial_offer))
-
-@bot.tree.command(name="salvage", description="Scavenge abandoned war zones for scrap DDR (3m Cooldown - Nerfed).")
-async def salvage_slash(interaction: discord.Interaction):
-    uid = bot._init_user(interaction.user.id)
-    now = time.time()
-    if now - bot.db["economy"][uid].get("last_salvage", 0) < 180:
-        return await interaction.response.send_message(f"Scrap fields looted! Wait `{int(180-(now-bot.db['economy'][uid].get('last_salvage', 0)))}s`.", ephemeral=True)
-    bot.db["economy"][uid]["last_salvage"] = now
-    
-    if random.random() < 0.85:
-        payout = random.randint(80, 220)
-        bot.update_balance(interaction.user.id, payout)
-        await interaction.response.send_message(f"⚙️ Salvaged **{payout:,} DDR** worth of scrap!")
-    else:
-        current_bal = bot.db["economy"][uid]["balance"]
-        loss = max(150, int(current_bal * 0.08))
-        bot.db["economy"][uid]["balance"] = max(0, current_bal - loss)
-        save_data(bot.db)
-        await interaction.response.send_message(f"💥 **BOOM!** Stepped on a landmine and lost **{loss:,} DDR** (`8%` wallet) in medical bills!")
-
-@bot.tree.command(name="beg", description="Ask around for pocket change (0 COOLDOWN).")
-async def beg(interaction: discord.Interaction):
-    uid = bot._init_user(interaction.user.id)
-    if random.random() < 0.75:
-        payout = random.randint(20, 60)
-        bot.db["economy"][uid]["balance"] += payout
-        save_data(bot.db)
-        await interaction.response.send_message(f"🥺 Someone tossed **{payout} DDR** into your cup! Balance: **{bot.db['economy'][uid]['balance']:,} DDR**")
-    else:
-        save_data(bot.db)
-        await interaction.response.send_message(f"❌ {random.choice(['Get a job, bum!', 'Someone threw an empty soda can at your head.', 'Ignored completely.'])}")
 
 @bot.tree.command(name="rob", description="Attempt petty theft on a player (3% cap / max 300 DDR - 15m cd).")
 async def rob(interaction: discord.Interaction, target: discord.User):
