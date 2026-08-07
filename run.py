@@ -2058,27 +2058,30 @@ async def blackjack_slash(interaction: discord.Interaction, bet: int):
     await interaction.response.send_message(embed=view.generate_embed(), view=view)
 
 # Reverted to Original Clean Slots Display
-@bot.tree.command(name="slots", description="Spin the classic 3-reel slot machine.")
-async def slots_slash(interaction: discord.Interaction, bet: int):
-    if bet <= 0: return await interaction.response.send_message("Bet must be positive.", ephemeral=True)
-    if bot.get_balance(interaction.user.id) < bet: return await interaction.response.send_message("Insufficient funds.", ephemeral=True)
+@bot.tree.command(name="slots", description="Spin the high risk slot machines.")
+async def slots(interaction: discord.Interaction, bet: int):
+    if bet <= 0: return await interaction.response.send_message("Invalid bet.", ephemeral=True)
+    if bot.get_balance(interaction.user.id) < bet: return await interaction.response.send_message("Too poor.", ephemeral=True)
     
     bot.update_balance(interaction.user.id, -bet)
-    emojis = ["🍒", "🍋", "🍇", "🔔", "💎", "7️⃣"]
-    spin = [random.choice(emojis) for _ in range(3)]
+    symbols = ["🍒", "🍒", "🍒", "🍋", "🍋", "🍇", "🔔", "💎", "7️⃣"]
+    s1, s2, s3 = random.choice(symbols), random.choice(symbols), random.choice(symbols)
     
-    mult = 1.2 if bot.has_luck(interaction.user.id) else 1.0
-    if spin[0] == spin[1] == spin[2]:
-        payout = int(bet * 5 * mult)
+    multiplier = 0
+    if s1 == s2 == s3:
+        if s1 == "7️⃣": multiplier = 40
+        elif s1 == "💎": multiplier = 20
+        else: multiplier = 6
+    elif s1 == s2 or s2 == s3 or s1 == s3:
+        multiplier = 1.5
+
+    mult_luck = 1.2 if bot.has_luck(interaction.user.id) else 1.0
+    if multiplier > 0:
+        payout = int(bet * multiplier * mult_luck)
         bot.update_balance(interaction.user.id, payout)
-        msg = f"🎰 | {spin[0]} : {spin[1]} : {spin[2]} |\nJACKPOT! Triple match! You won **{payout:,} DDR**!"
-    elif spin[0] == spin[1] or spin[1] == spin[2] or spin[0] == spin[2]:
-        payout = int(bet * 2 * mult)
-        bot.update_balance(interaction.user.id, payout)
-        msg = f"🎰 | {spin[0]} : {spin[1]} : {spin[2]} |\nPair match! You won **{payout:,} DDR**!"
+        await interaction.response.send_message(f"🎰 | {s1} : {s2} : {s3} |\nYou won **{payout:,} DDR** (`{multiplier}x`)!")
     else:
-        msg = f"🎰 | {spin[0]} : {spin[1]} : {spin[2]} |\nNo match. You lost **{bet:,} DDR**."
-    await interaction.response.send_message(msg)
+        await interaction.response.send_message(f"🎰 | {s1} : {s2} : {s3} |\nNo match. You lost **{bet:,} DDR**.")
 
 @bot.tree.command(name="roulette", description="Bet on the casino roulette wheel (Red 2x, Black 2x, or Green 14x).")
 @app_commands.choices(choice=[
