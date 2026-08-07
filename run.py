@@ -17,7 +17,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "PackBot Cities & Industry Engine is online."
+    return "PackBot Classic & Industry Engine is online."
 
 def run():
     port = int(os.environ.get("PORT", 8080))
@@ -123,7 +123,6 @@ SHOP_ITEMS = {
     }
 }
 
-# Expand City Buildings with Military-Industrial Structures
 CITY_BUILDINGS = {
     "factory":         {"name": "🏭 Manufacturing Factory", "cost": 800,  "output": 150, "type": "civilian", "desc": "Base industrial output (+150 DDR/hr)."},
     "tech_park":       {"name": "🖥️ Innovation Tech Park",  "cost": 1800, "output": 300, "type": "civilian", "desc": "Advanced technology center (+300 DDR/hr)."},
@@ -161,6 +160,7 @@ class PackBot(commands.Bot):
                 "last_contract": 0,
                 "last_smuggle": 0,
                 "last_extort": 0,
+                "last_rob": 0,
                 "loan_amount": 0,
                 "loan_due": 0,
                 "loan_interest": 0.0,
@@ -178,6 +178,7 @@ class PackBot(commands.Bot):
                 "last_contract": 0,
                 "last_smuggle": 0,
                 "last_extort": 0,
+                "last_rob": 0,
                 "loan_amount": 0, 
                 "loan_due": 0, 
                 "loan_interest": 0.0,
@@ -237,7 +238,7 @@ class PackBot(commands.Bot):
         self.session = aiohttp.ClientSession()
         await self.tree.sync()
         self.update_market_and_treasury.start()
-        print(f"--- PACKBOT CITIES & INDUSTRY ENGINE ONLINE ---\n")
+        print(f"--- PACKBOT CLASSIC & INDUSTRY ENGINE ONLINE ---\n")
 
     STOCK_CHANNEL_ID = 1522622210542407750 
 
@@ -271,7 +272,6 @@ class PackBot(commands.Bot):
             self.db["stocks"]["DUDU"]["price"] = new_price
             self.db["stocks"]["DUDU"]["last_update"] = time.time()
 
-            # TREASURY & BOND INTEREST YIELDS (+1.5% treasury, +1.0% municipal bonds per 30 mins)
             for fid, fac in self.db["factions"].items():
                 if fac.get("treasury", 0) > 0:
                     interest = int(fac["treasury"] * 0.015)
@@ -381,7 +381,7 @@ async def global_server_lock(interaction: discord.Interaction) -> bool:
         return False
     return True
 
-# --- WORK MATH MINIGAME VIEW (REVERTED TO MATH PROBLEMS) ---
+# --- WORK MATH MINIGAME VIEW ---
 class MathWorkView(discord.ui.View):
     def __init__(self, user, correct_val, prompt_txt, answers_list):
         super().__init__(timeout=15)
@@ -463,7 +463,7 @@ class CrimeHeistView(discord.ui.View):
             await interaction.response.edit_message(embed=embed, view=self)
         return callback
 
-# --- INTUITIVE MERCENARY CONTRACT VIEW (EASIER / BETTER QUESTIONS) ---
+# --- MILITARY-THEMED CONTRACT VIEW ---
 class ContractMinigameView(discord.ui.View):
     def __init__(self, user, scenario_title, correct_choice, options_list):
         super().__init__(timeout=15)
@@ -483,13 +483,13 @@ class ContractMinigameView(discord.ui.View):
             if choice == self.correct_choice:
                 reward = random.randint(220, 480)
                 bot.update_balance(self.user.id, reward)
-                embed = discord.Embed(title="🎯 MERCENARY CONTRACT COMPLETED", color=0x2ecc71)
-                embed.description = f"You executed **{choice}** cleanly.\n**Payout:** `+{reward:,} DDR`"
+                embed = discord.Embed(title="🎯 MILITARY CONTRACT COMPLETED", color=0x2ecc71)
+                embed.description = f"Successfully executed **{choice}** against enemy lines.\n**Payout:** `+{reward:,} DDR`"
             else:
                 penalty = random.randint(40, 90)
                 bot.update_balance(self.user.id, -penalty)
                 embed = discord.Embed(title="💥 CONTRACT FAILED", color=0xe74c3c)
-                embed.description = f"Your approach (**{choice}**) was spotted by security guards.\n**Losses:** `-{penalty:,} DDR` retreat penalty."
+                embed.description = f"Your approach (**{choice}**) was intercepted by enemy forces.\n**Losses:** `-{penalty:,} DDR` equipment retreat cost."
             await interaction.response.edit_message(embed=embed, view=self)
         return callback
 
@@ -543,18 +543,20 @@ class SmuggleMinigameView(discord.ui.View):
                 embed.description = f"Border patrol inspected the vehicle. Cargo confiscated and you paid a **{fine:,} DDR** penalty."
         await interaction.response.edit_message(embed=embed, view=self)
 
-# --- CLASSIC SINGLE-PLAYER BLACKJACK VIEW ---
-class SinglePlayerBlackjackView(discord.ui.View):
-    def __init__(self, user, bet):
-        super().__init__(timeout=45)
-        self.user = user
+# --- REVERTED TO MULTIPLAYER BLACKJACK LOBBY VIEW ---
+class MultiplayerBlackjackView(discord.ui.View):
+    def __init__(self, host, bet):
+        super().__init__(timeout=60)
+        self.host = host
         self.bet = bet
+        self.players = {host.id: {"hand": [], "stood": False}}
         suits = ['♠', '♥', '♦', '♣']
         ranks = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
         self.deck = [{'rank': r, 'suit': s, 'val': 10 if r in ['J','Q','K'] else (11 if r=='A' else int(r))} for s in suits for r in ranks]
         random.shuffle(self.deck)
-        self.player_hand = [self.deck.pop(), self.deck.pop()]
         self.dealer_hand = [self.deck.pop(), self.deck.pop()]
+        # Deal initial cards to host
+        self.players[host.id]["hand"] = [self.deck.pop(), self.deck.pop()]
 
     def calc(self, hand):
         score = sum(c['val'] for c in hand)
@@ -569,52 +571,88 @@ class SinglePlayerBlackjackView(discord.ui.View):
             return f"│ {hand[0]['rank']}{hand[0]['suit']} │  ??  │"
         return "  ".join([f"│ {c['rank']}{c['suit']} │" for c in hand])
 
-    def generate_embed(self, done=False, result_msg=""):
-        p_score = self.calc(self.player_hand)
-        embed = discord.Embed(title="🃏 Classic Blackjack Table", color=0x2b2d31)
-        if not done:
-            embed.add_field(name="Dealer's Hand", value=f"```\n{self.fmt(self.dealer_hand, hide_second=True)}\n```", inline=False)
-            embed.add_field(name=f"Your Hand ({p_score})", value=f"```\n{self.fmt(self.player_hand)}\n```", inline=False)
-            embed.set_footer(text="Hit for another card, or Stand to end your turn.")
+    def generate_embed(self, done=False, result_text=""):
+        embed = discord.Embed(title="🃏 Multiplayer Blackjack Table Lobby", color=0x2b2d31)
+        embed.add_field(name="Dealer's Hand", value=f"```\n{self.fmt(self.dealer_hand, hide_second=not done)}\n```", inline=False)
+        
+        for pid, pdata in self.players.items():
+            score = self.calc(pdata["hand"])
+            status = "STAND" if pdata["stood"] else ("BUST" if score > 21 else "ACTIVE")
+            embed.add_field(name=f"Player <@{pid}> [{status}] ({score})", value=f"```\n{self.fmt(pdata['hand'])}\n```", inline=False)
+            
+        if done:
+            embed.description = f"**Table Results:**\n{result_text}"
         else:
-            d_score = self.calc(self.dealer_hand)
-            embed.add_field(name=f"Dealer's Hand ({d_score})", value=f"```\n{self.fmt(self.dealer_hand)}\n```", inline=False)
-            embed.add_field(name=f"Your Hand ({p_score})", value=f"```\n{self.fmt(self.player_hand)}\n```", inline=False)
-            embed.description = f"**{result_msg}**"
+            embed.set_footer(text="Click 'Join Table' to participate, or Hit/Stand if you are already seated.")
         return embed
 
-    @discord.ui.button(label="Hit", style=discord.ButtonStyle.primary, custom_id="bj_hit_single")
+    @discord.ui.button(label="Join Table", style=discord.ButtonStyle.success, custom_id="bj_join")
+    async def join_table(self, interaction: discord.Interaction, button: discord.ui.Button):
+        uid = interaction.user.id
+        if uid in self.players:
+            return await interaction.response.send_message("You are already seated at this table!", ephemeral=True)
+        if bot.get_balance(uid) < self.bet:
+            return await interaction.response.send_message("Insufficient funds to match table bet!", ephemeral=True)
+        bot.update_balance(uid, -self.bet)
+        self.players[uid] = {"hand": [self.deck.pop(), self.deck.pop()], "stood": False}
+        await interaction.response.edit_message(embed=self.generate_embed(), view=self)
+
+    @discord.ui.button(label="Hit", style=discord.ButtonStyle.primary, custom_id="bj_hit")
     async def hit_card(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user.id: return await interaction.response.send_message("Not your table!", ephemeral=True)
-        self.player_hand.append(self.deck.pop())
-        if self.calc(self.player_hand) > 21:
-            self.stop()
-            for child in self.children: child.disabled = True
-            await interaction.response.edit_message(embed=self.generate_embed(done=True, result_msg="💥 BUST! You went over 21 and lost your bet."), view=None)
+        uid = interaction.user.id
+        if uid not in self.players:
+            return await interaction.response.send_message("You are not seated at this table! Click 'Join Table' first.", ephemeral=True)
+        pdata = self.players[uid]
+        if pdata["stood"] or self.calc(pdata["hand"]) > 21:
+            return await interaction.response.send_message("Your turn is already finished or you busted!", ephemeral=True)
+            
+        pdata["hand"].append(self.deck.pop())
+        if self.calc(pdata["hand"]) > 21:
+            pdata["stood"] = True
+            
+        # Check if all players finished
+        if all(p["stood"] or self.calc(p["hand"]) > 21 for p in self.players.values()):
+            await self.finish_game(interaction)
         else:
             await interaction.response.edit_message(embed=self.generate_embed(), view=self)
 
-    @discord.ui.button(label="Stand", style=discord.ButtonStyle.secondary, custom_id="bj_stand_single")
+    @discord.ui.button(label="Stand", style=discord.ButtonStyle.secondary, custom_id="bj_stand")
     async def stand_card(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user.id: return await interaction.response.send_message("Not your table!", ephemeral=True)
+        uid = interaction.user.id
+        if uid not in self.players:
+            return await interaction.response.send_message("You are not seated at this table!", ephemeral=True)
+        self.players[uid]["stood"] = True
+        
+        if all(p["stood"] or self.calc(p["hand"]) > 21 for p in self.players.values()):
+            await self.finish_game(interaction)
+        else:
+            await interaction.response.edit_message(embed=self.generate_embed(), view=self)
+
+    async def finish_game(self, interaction: discord.Interaction):
         self.stop()
         for child in self.children: child.disabled = True
+        
         while self.calc(self.dealer_hand) < 17:
             self.dealer_hand.append(self.deck.pop())
         d_score = self.calc(self.dealer_hand)
-        p_score = self.calc(self.player_hand)
         
-        mult = 1.2 if bot.has_luck(self.user.id) else 1.0
-        if d_score > 21 or p_score > d_score:
-            winnings = int(self.bet * 2 * mult)
-            bot.update_balance(self.user.id, winnings)
-            msg = f"🎉 YOU WIN! Dealer scored {d_score}. Collected **{winnings:,} DDR**!"
-        elif p_score == d_score:
-            bot.update_balance(self.user.id, self.bet)
-            msg = f"🤝 PUSH! Tie game at {p_score}. Bet returned."
-        else:
-            msg = f"❌ DEALER WINS ({d_score} vs {p_score}). You lost your bet."
-        await interaction.response.edit_message(embed=self.generate_embed(done=True, result_msg=msg), view=None)
+        results = []
+        mult = 1.25 if bot.has_luck(self.host.id) else 1.0 # applies to table host or individual
+        for pid, pdata in self.players.items():
+            p_score = self.calc(pdata["hand"])
+            if p_score > 21:
+                results.append(f"<@{pid}> busted with {p_score}.")
+            elif d_score > 21 or p_score > d_score:
+                win = int(self.bet * 2 * mult)
+                bot.update_balance(pid, win)
+                results.append(f"<@{pid}> won **{win:,} DDR**!")
+            elif p_score == d_score:
+                bot.update_balance(pid, self.bet)
+                results.append(f"<@{pid}> tied with dealer (Push). Bet returned.")
+            else:
+                results.append(f"<@{pid}> lost to dealer ({p_score} vs {d_score}).")
+                
+        await interaction.response.edit_message(embed=self.generate_embed(done=True, result_text="\n".join(results)), view=None)
 
 # --- CATEGORIZED HELP EMBED ---
 def build_help_embed(user_id):
@@ -634,10 +672,10 @@ def build_help_embed(user_id):
         value="`/daily` - Claim your municipal daily dividend (1,000 DDR)\n"
               "`/work` - Solve quick math problems for steady cash\n"
               "`/crime` - Select high-stakes targets for underground heists\n"
-              "`/contract` - Complete mercenary hit dispatches\n"
+              "`/contract` - Complete military tactical dispatches\n"
               "`/smuggle` - Transport border contraband for push-your-luck payouts\n"
               "`/invest <action> [amount]` - Open municipal bond funds (+4% yield every 3h)\n"
-              "`/rob <user>` - Attempt petty theft on another player's wallet\n"
+              "`/rob <user>` - Attempt petty theft on another player's wallet (5m cooldown)\n"
               "`/balance` - View your cash, stock portfolio, and loans\n"
               "`/gift <user> <amount>` - Transfer DDR directly to another player\n"
               "`/leaderboard` - View richest players and shareholders\n"
@@ -647,7 +685,7 @@ def build_help_embed(user_id):
     embed.add_field(
         name="🎰 Casino & Games",
         value="`/coinflip <bet> <side>` - Classic coin flip for double or nothing\n"
-              "`/blackjack <bet>` - Fast single-player card table against Dealer\n"
+              "`/blackjack <bet>` - Open a multiplayer Blackjack table lobby\n"
               "`/slots <bet>` - Spin the classic 3-reel slot machine\n"
               "`/roulette <bet> <color>` - Bet on Red (2x), Black (2x), or Green (14x)\n"
               "`/highlow <bet> <guess>` - Guess if the next card is Higher or Lower\n"
@@ -835,7 +873,7 @@ async def blacklist_slash(interaction: discord.Interaction, target: discord.User
     save_data(bot.db)
     await interaction.response.send_message(msg)
 
-# --- CITY & INDUSTRY ENGINE (WITH MILITARY CITY SUPPORT) ---
+# --- CITY & INDUSTRY ENGINE ---
 city_group = app_commands.Group(name="city", description="Establish industrial municipalities, construct factories, and support your army.")
 bot.tree.add_command(city_group)
 
@@ -1015,8 +1053,11 @@ async def mafia_join(interaction: discord.Interaction, family_name: str):
 async def mafia_extort(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     now = time.time()
-    if now - bot.db["economy"][uid].get("last_extort", 0) < 60:
-        return await interaction.response.send_message("Detectives are patrolling the neighborhood. Lie low for a minute.", ephemeral=True)
+    cd = 60
+    diff = now - bot.db["economy"][uid].get("last_extort", 0)
+    if diff < cd:
+        rem = int(cd - diff)
+        return await interaction.response.send_message(f"Detectives are patrolling the neighborhood. Ready in **{rem // 60}m {rem % 60}s**.", ephemeral=True)
     bot.db["economy"][uid]["last_extort"] = now
     
     fam_id = bot.db["economy"][uid].get("mafia_family")
@@ -1431,7 +1472,6 @@ async def army_recruit(interaction: discord.Interaction, unit: app_commands.Choi
     unit_key = unit.value
     base_cost = UNIT_STATS[unit_key]["cost"]
     
-    # Apply municipal military discounts!
     discount_mult = 1.0
     discount_msg = ""
     if uid in bot.db["cities"]:
@@ -1525,7 +1565,7 @@ async def war_world_status(interaction: discord.Interaction):
     )
     await interaction.response.send_message(embed=embed)
 
-# --- 3-PHASE COMBINED ARMS RAID ENGINE (DEFENSE DEPLETION & NO SHIELD IMMUNITY) ---
+# --- 3-PHASE COMBINED ARMS RAID ENGINE ---
 @war_group.command(name="raid", description="Launch a realistic 3-Phase Multi-Domain Assault on an enemy regime.")
 async def war_raid(interaction: discord.Interaction, target_regime: str):
     uid = bot._init_user(interaction.user.id)
@@ -1546,13 +1586,15 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
         return await interaction.response.send_message("A temporary Ceasefire is currently blocking hostilities!", ephemeral=True)
         
     now = time.time()
-    if now - atk_fac.get("last_raid", 0) < 300: # 5 MINUTES COOLDOWN
-        return await interaction.response.send_message("Frontline assault columns are reorganizing. Wait for the dust to settle before attacking again.", ephemeral=True)
+    cd = 300
+    diff = now - atk_fac.get("last_raid", 0)
+    if diff < cd:
+        rem = int(cd - diff)
+        return await interaction.response.send_message(f"Frontline assault columns are reorganizing. Ready in **{rem // 60}m {rem % 60}s**.", ephemeral=True)
         
     atk_fac["last_raid"] = now
-    atk_army, def_army = atk_fac["army"], def_fac["army"]
+    atk_army, def_army = atk_fac["army"], def_army["army"]
     
-    # --- PHASE I: AIR CONTEST (BOMBER DOGFIGHTS & COUNTER-ATTACKS) ---
     air_atk = atk_army.get("bombers", 0) * UNIT_STATS["bombers"]["atk"]
     air_def_flak = def_army.get("flak", 0) * UNIT_STATS["flak"]["def"]
     air_def_bombers = def_army.get("bombers", 0) * UNIT_STATS["bombers"]["atk"]
@@ -1577,7 +1619,6 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
     else:
         phase1_report = "☁️ **Air Neutral:** Neither side achieved clear air dominance."
         
-    # --- PHASE II: ARTILLERY BARRAGE ---
     art_atk = atk_army.get("artillery", 0) * UNIT_STATS["artillery"]["atk"]
     art_def = def_army.get("artillery", 0) * UNIT_STATS["artillery"]["atk"]
     phase2_report = ""
@@ -1590,7 +1631,6 @@ async def war_raid(interaction: discord.Interaction, target_regime: str):
         atk_army["infantry"] = max(0, atk_army.get("infantry", 0) - inf_kills)
         phase2_report = f"🛡️ **Defender Counter-Battery:** Defender Artillery fire halted the advance, slaying `{inf_kills}x` Attacker Infantry."
     
-    # --- PHASE III: GROUND & MECHANIZED CLASH ---
     atk_power, _ = get_faction_power(atk_fac)
     _, def_power = get_faction_power(def_fac)
     combat_atk = atk_power * random.uniform(0.85, 1.15)
@@ -1652,8 +1692,11 @@ async def war_bomb(interaction: discord.Interaction, target_regime: str):
     if atk_fac["army"].get("bombers", 0) <= 0: return await interaction.response.send_message("No Bomber Squadrons available!", ephemeral=True)
     now = time.time()
     
-    if now - atk_fac.get("last_bomb", 0) < 3000:
-        return await interaction.response.send_message("Bomber squadrons are rearming on the tarmac. Airstrike unavailable.", ephemeral=True)
+    cd = 3000
+    diff = now - atk_fac.get("last_bomb", 0)
+    if diff < cd:
+        rem = int(cd - diff)
+        return await interaction.response.send_message(f"Bomber squadrons are rearming on the tarmac. Ready in **{rem // 60}m {rem % 60}s**.", ephemeral=True)
     atk_fac["last_bomb"] = now
     
     flak_count = def_fac["army"].get("flak", 0)
@@ -1726,8 +1769,14 @@ async def war_propaganda(interaction: discord.Interaction, target_regime: str):
     if defender_fid not in bot.db["factions"] or defender_fid == attacker_fid: return await interaction.response.send_message("Invalid target.", ephemeral=True)
     atk_fac, def_fac = bot.db["factions"][attacker_fid], bot.db["factions"][defender_fid]
     now = time.time()
-    if now - atk_fac.get("last_propaganda", 0) < 7200: return await interaction.response.send_message("Transmitters cooling down!", ephemeral=True)
+    
+    cd = 7200
+    diff = now - atk_fac.get("last_propaganda", 0)
+    if diff < cd:
+        rem = int(cd - diff)
+        return await interaction.response.send_message(f"Transmitters cooling down. Ready in **{rem // 3600}h {(rem % 3600) // 60}m**.", ephemeral=True)
     atk_fac["last_propaganda"] = now
+    
     siphoned = int(def_fac["treasury"] * 0.10)
     def_fac["treasury"] -= siphoned
     atk_fac["treasury"] += siphoned
@@ -1769,30 +1818,32 @@ async def war_declare_enemy(interaction: discord.Interaction, target_regime: str
 async def daily_slash(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     now = time.time()
-    if now - bot.db["economy"][uid]["last_daily"] < 86400:
-        return await interaction.response.send_message("Your daily municipal dividend has already been claimed. Check back in 24 hours.", ephemeral=True)
+    cd = 86400
+    diff = now - bot.db["economy"][uid]["last_daily"]
+    if diff < cd:
+        rem = int(cd - diff)
+        return await interaction.response.send_message(f"Daily dividend already claimed. Ready in **{rem // 3600}h {(rem % 3600) // 60}m**.", ephemeral=True)
     bot.db["economy"][uid]["last_daily"] = now
     bot.db["economy"][uid]["balance"] += 1000
     save_data(bot.db)
     await interaction.response.send_message(f"✅ Claimed daily dividend of **1,000 DDR**!")
 
-# --- REVERTED TO MATH PROBLEMS FOR WORK ---
 @bot.tree.command(name="work", description="Solve quick math problems for steady cash.")
 async def work_slash(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     now = time.time()
-    if now - bot.db["economy"][uid].get("last_work", 0) < 300:
-        return await interaction.response.send_message("You are resting between shifts. Check back shortly.", ephemeral=True)
+    cd = 300
+    diff = now - bot.db["economy"][uid].get("last_work", 0)
+    if diff < cd:
+        rem = int(cd - diff)
+        return await interaction.response.send_message(f"You are resting between shifts. Ready in **{rem // 60}m {rem % 60}s**.", ephemeral=True)
     bot.db["economy"][uid]["last_work"] = now
     
-    # Generate snappy arithmetic equations
     a = random.randint(12, 45)
     b = random.randint(10, 35)
     op = random.choice(["+", "-", "*"])
-    if op == "+":
-        ans = a + b
-    elif op == "-":
-        ans = a - b
+    if op == "+": ans = a + b
+    elif op == "-": ans = a - b
     else:
         a = random.randint(5, 15)
         b = random.randint(4, 12)
@@ -1801,8 +1852,7 @@ async def work_slash(interaction: discord.Interaction):
     wrong_answers = set()
     while len(wrong_answers) < 3:
         w = ans + random.choice([-10, -5, -3, -2, -1, 1, 2, 3, 5, 10])
-        if w != ans:
-            wrong_answers.add(w)
+        if w != ans: wrong_answers.add(w)
             
     all_options = list(wrong_answers) + [ans]
     random.shuffle(all_options)
@@ -1817,8 +1867,11 @@ async def work_slash(interaction: discord.Interaction):
 async def crime_slash(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     now = time.time()
-    if now - bot.db["economy"][uid].get("last_crime", 0) < 180:
-        return await interaction.response.send_message("Detectives are patrolling the neighborhood. Lie low for a bit.", ephemeral=True)
+    cd = 180
+    diff = now - bot.db["economy"][uid].get("last_crime", 0)
+    if diff < cd:
+        rem = int(cd - diff)
+        return await interaction.response.send_message(f"Detectives are patrolling. Ready in **{rem // 60}m {rem % 60}s**.", ephemeral=True)
     bot.db["economy"][uid]["last_crime"] = now
     
     embed = discord.Embed(title="🕴️ SELECT A HEIST TARGET", color=0x2c3e50)
@@ -1828,27 +1881,28 @@ async def crime_slash(interaction: discord.Interaction):
     view = CrimeHeistView(interaction.user)
     await interaction.response.send_message(embed=embed, view=view)
 
-# --- REDESIGNED FOR EASIER & INTUITIVE CONTRACTS ---
-@bot.tree.command(name="contract", description="Complete mercenary hit dispatches.")
+@bot.tree.command(name="contract", description="Complete military tactical dispatches.")
 async def contract_slash(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     now = time.time()
-    if now - bot.db["economy"][uid].get("last_contract", 0) < 600:
-        return await interaction.response.send_message("Your equipment is currently undergoing field repairs.", ephemeral=True)
+    cd = 600
+    diff = now - bot.db["economy"][uid].get("last_contract", 0)
+    if diff < cd:
+        rem = int(cd - diff)
+        return await interaction.response.send_message(f"Equipment undergoing field repairs. Ready in **{rem // 60}m {rem % 60}s**.", ephemeral=True)
     bot.db["economy"][uid]["last_contract"] = now
     
-    # Intuitive tactical choices with clear logical answers
     scenarios = [
-        ("Corrupt VIP in an Armored Sedan", "Sniper Rifle Ambush", ["Sniper Rifle Ambush", "Hand Crank", "Plastic Knife"]),
-        ("Rival Smuggler Warehouse Guarded by Dogs", "Sleep Toxin Grenade", ["Sleep Toxin Grenade", "Air Horn", "Megaphone Alert"]),
-        ("Fleeing Bank Robber on a Speedboat", "Harpoon Intercept Boat", ["Harpoon Intercept Boat", "Bicycle Chase", "Rollerblades"]),
-        ("Underground Syndicate Gambling Den", "EMP Power Blackout", ["EMP Power Blackout", "Polite Knock", "Yelling Outside"])
+        ("Intercept Enemy Supply Convoy", "Ambush with Heavy Armor", ["Ambush with Heavy Armor", "Singing Songs", "Holding White Flag"]),
+        ("Neutralize Enemy Artillery Battery", "Precision Air Strike", ["Precision Air Strike", "Throwing Rocks", "Writing Letters"]),
+        ("Secure Frontline Munitions Depot", "Infantry Night Assault", ["Infantry Night Assault", "Walking Blindfolded", "Leaving Doors Open"]),
+        ("Reconnaissance on Enemy Radar Post", "Stealth Drone Surveillance", ["Stealth Drone Surveillance", "Marching a Brass Band", "Shooting Fireworks"])
     ]
     title, correct, opts = random.choice(scenarios)
     random.shuffle(opts)
     
-    embed = discord.Embed(title="🎯 MERCENARY OPERATION DISPATCH", color=0xe67e22)
-    embed.description = f"**Objective Target:** `{title}`\n\nSelect the most effective tactical approach to complete the hit."
+    embed = discord.Embed(title="🎯 MILITARY TACTICAL DISPATCH", color=0xe67e22)
+    embed.description = f"**Objective:** `{title}`\n\nSelect the most effective military strategy to complete the mission."
     view = ContractMinigameView(interaction.user, title, correct, opts)
     await interaction.response.send_message(embed=embed, view=view)
 
@@ -1856,8 +1910,11 @@ async def contract_slash(interaction: discord.Interaction):
 async def smuggle_slash(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     now = time.time()
-    if now - bot.db["economy"][uid].get("last_smuggle", 0) < 900:
-        return await interaction.response.send_message("Border customs are currently inspecting transport logs.", ephemeral=True)
+    cd = 900
+    diff = now - bot.db["economy"][uid].get("last_smuggle", 0)
+    if diff < cd:
+        rem = int(cd - diff)
+        return await interaction.response.send_message(f"Border customs inspecting logs. Ready in **{rem // 60}m {rem % 60}s**.", ephemeral=True)
     bot.db["economy"][uid]["last_smuggle"] = now
     
     offer = random.randint(300, 700)
@@ -1891,12 +1948,20 @@ async def invest_slash(interaction: discord.Interaction, action: app_commands.Ch
         save_data(bot.db)
         await interaction.response.send_message(f"💵 Withdrew **{amount:,} DDR** from your municipal bond fund. Liquid Cash: **{user_data['balance']:,} DDR**.")
 
-@bot.tree.command(name="rob", description="Attempt petty theft on another player's wallet.")
+@bot.tree.command(name="rob", description="Attempt petty theft on another player's wallet (Nerfed with 5m Cooldown).")
 async def rob_slash(interaction: discord.Interaction, target: discord.User):
     if target.bot or target.id == interaction.user.id: return await interaction.response.send_message("Invalid target.", ephemeral=True)
     uid = bot._init_user(interaction.user.id)
-    t_uid = bot._init_user(target.id)
     
+    now = time.time()
+    cd = 300 # 5 Minute Cooldown for Rob
+    diff = now - bot.db["economy"][uid].get("last_rob", 0)
+    if diff < cd:
+        rem = int(cd - diff)
+        return await interaction.response.send_message(f"You are laying low from recent heists. Ready in **{rem // 60}m {rem % 60}s**.", ephemeral=True)
+    bot.db["economy"][uid]["last_rob"] = now
+    
+    t_uid = bot._init_user(target.id)
     t_inv = bot.db["economy"][t_uid].setdefault("inventory", {})
     if t_inv.get("padlock", 0) > 0:
         t_inv["padlock"] -= 1
@@ -1908,18 +1973,18 @@ async def rob_slash(interaction: discord.Interaction, target: discord.User):
     t_bal = bot.db["economy"][t_uid]["balance"]
     if t_bal < 50: return await interaction.response.send_message("Target has no cash worth stealing.", ephemeral=True)
 
-    if random.random() < 0.45:
-        stolen = random.randint(10, int(t_bal * 0.25))
+    if random.random() < 0.35: # Nerfed success rate
+        stolen = random.randint(10, int(t_bal * 0.15))
         bot.db["economy"][uid]["balance"] += stolen
         bot.db["economy"][t_uid]["balance"] -= stolen
         save_data(bot.db)
         await interaction.response.send_message(f"💸 Pickpocketed **{stolen:,} DDR** from {target.mention}!")
     else:
-        penalty = min(bot.db["economy"][uid]["balance"], 100)
+        penalty = min(bot.db["economy"][uid]["balance"], 200) # Increased penalty
         bot.db["economy"][uid]["balance"] -= penalty
         bot.db["economy"][t_uid]["balance"] += penalty
         save_data(bot.db)
-        await interaction.response.send_message(f"🚓 Caught attempting to rob {target.mention}! Paid a **{penalty:,} DDR** fine.")
+        await interaction.response.send_message(f"🚓 Caught attempting to rob {target.mention}! Paid a heavy **{penalty:,} DDR** fine.")
 
 @bot.tree.command(name="balance", description="View your liquid cash, stock holdings, and active loans.")
 async def balance_slash(interaction: discord.Interaction, user: discord.User = None):
@@ -1963,7 +2028,7 @@ async def loan_slash(interaction: discord.Interaction, action: app_commands.Choi
         save_data(bot.db)
         await interaction.response.send_message(f"✅ Loan repaid in full (**{owed_amount:,} DDR**). Credit cleared.")
 
-# --- CLASSIC CASINO & REVERTED SLOTS COMMANDS ---
+# --- CASINO COMMANDS ---
 @bot.tree.command(name="coinflip", description="Classic coin flip for double or nothing.")
 @app_commands.choices(side=[
     app_commands.Choice(name="Heads", value="heads"),
@@ -1983,31 +2048,37 @@ async def coinflip_slash(interaction: discord.Interaction, bet: int, side: app_c
         bot.update_balance(interaction.user.id, -bet)
         await interaction.response.send_message(f"🪙 Coin landed against you! Lost **{bet:,} DDR**.")
 
-# Reverted to Classic Fast Single-Player Blackjack
-@bot.tree.command(name="blackjack", description="Classic single-player Blackjack table against the Dealer.")
+# Reverted to Multiplayer Blackjack Table Lobby
+@bot.tree.command(name="blackjack", description="Open a multiplayer Blackjack table lobby.")
 async def blackjack_slash(interaction: discord.Interaction, bet: int):
     if bet <= 0: return await interaction.response.send_message("Bet must be positive.", ephemeral=True)
     if bot.get_balance(interaction.user.id) < bet: return await interaction.response.send_message("Insufficient funds.", ephemeral=True)
     bot.update_balance(interaction.user.id, -bet)
-    view = SinglePlayerBlackjackView(interaction.user, bet)
+    view = MultiplayerBlackjackView(interaction.user, bet)
     await interaction.response.send_message(embed=view.generate_embed(), view=view)
 
-@bot.tree.command(name="slots", description="Spin the high risk slot machines.")
-async def slots(interaction: discord.Interaction, bet: int):
-    if bet <= 0: return await interaction.response.send_message("Invalid bet.", ephemeral=True)
-    if bot.get_balance(interaction.user.id) < bet: return await interaction.response.send_message("Too poor.", ephemeral=True)
+# Reverted to Original Clean Slots Display
+@bot.tree.command(name="slots", description="Spin the classic 3-reel slot machine.")
+async def slots_slash(interaction: discord.Interaction, bet: int):
+    if bet <= 0: return await interaction.response.send_message("Bet must be positive.", ephemeral=True)
+    if bot.get_balance(interaction.user.id) < bet: return await interaction.response.send_message("Insufficient funds.", ephemeral=True)
     
     bot.update_balance(interaction.user.id, -bet)
-    symbols = ["🍒", "🍒", "🍒", "🍋", "🍋", "🍇", "🔔", "💎", "7️⃣"]
-    s1, s2, s3 = random.choice(symbols), random.choice(symbols), random.choice(symbols)
+    emojis = ["🍒", "🍋", "🍇", "🔔", "💎", "7️⃣"]
+    spin = [random.choice(emojis) for _ in range(3)]
     
-    multiplier = 0
-    if s1 == s2 == s3:
-        if s1 == "7️⃣": multiplier = 40
-        elif s1 == "💎": multiplier = 20
-        else: multiplier = 6
-    elif s1 == s2 or s2 == s3 or s1 == s3:
-        multiplier = 1.5
+    mult = 1.2 if bot.has_luck(interaction.user.id) else 1.0
+    if spin[0] == spin[1] == spin[2]:
+        payout = int(bet * 5 * mult)
+        bot.update_balance(interaction.user.id, payout)
+        msg = f"🎰 | {spin[0]} : {spin[1]} : {spin[2]} |\nJACKPOT! Triple match! You won **{payout:,} DDR**!"
+    elif spin[0] == spin[1] or spin[1] == spin[2] or spin[0] == spin[2]:
+        payout = int(bet * 2 * mult)
+        bot.update_balance(interaction.user.id, payout)
+        msg = f"🎰 | {spin[0]} : {spin[1]} : {spin[2]} |\nPair match! You won **{payout:,} DDR**!"
+    else:
+        msg = f"🎰 | {spin[0]} : {spin[1]} : {spin[2]} |\nNo match. You lost **{bet:,} DDR**."
+    await interaction.response.send_message(msg)
 
 @bot.tree.command(name="roulette", description="Bet on the casino roulette wheel (Red 2x, Black 2x, or Green 14x).")
 @app_commands.choices(choice=[
