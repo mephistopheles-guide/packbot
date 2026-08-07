@@ -1992,28 +1992,22 @@ async def blackjack_slash(interaction: discord.Interaction, bet: int):
     view = SinglePlayerBlackjackView(interaction.user, bet)
     await interaction.response.send_message(embed=view.generate_embed(), view=view)
 
-# Reverted to Classic Simple 3-Reel Slots
-@bot.tree.command(name="slots", description="Spin the classic 3-reel slot machine.")
-async def slots_slash(interaction: discord.Interaction, bet: int):
-    if bet <= 0: return await interaction.response.send_message("Bet must be positive.", ephemeral=True)
-    if bot.get_balance(interaction.user.id) < bet: return await interaction.response.send_message("Insufficient funds.", ephemeral=True)
+@bot.tree.command(name="slots", description="Spin the high risk slot machines.")
+async def slots(interaction: discord.Interaction, bet: int):
+    if bet <= 0: return await interaction.response.send_message("Invalid bet.", ephemeral=True)
+    if bot.get_balance(interaction.user.id) < bet: return await interaction.response.send_message("Too poor.", ephemeral=True)
     
     bot.update_balance(interaction.user.id, -bet)
-    emojis = ["🍒", "🍋", "🍇", "🔔", "💎", "7️⃣"]
-    spin = [random.choice(emojis) for _ in range(3)]
+    symbols = ["🍒", "🍒", "🍒", "🍋", "🍋", "🍇", "🔔", "💎", "7️⃣"]
+    s1, s2, s3 = random.choice(symbols), random.choice(symbols), random.choice(symbols)
     
-    mult = 1.2 if bot.has_luck(interaction.user.id) else 1.0
-    if spin[0] == spin[1] == spin[2]:
-        payout = int(bet * 5 * mult)
-        bot.update_balance(interaction.user.id, payout)
-        msg = f"🎰 **| {' : '.join(spin)} |** 🎰\nJACKPOT! Triple match! You won **{payout:,} DDR**!"
-    elif spin[0] == spin[1] or spin[1] == spin[2] or spin[0] == spin[2]:
-        payout = int(bet * 2 * mult)
-        bot.update_balance(interaction.user.id, payout)
-        msg = f"🎰 **| {' : '.join(spin)} |** 🎰\nPair match! You won **{payout:,} DDR**!"
-    else:
-        msg = f"🎰 **| {' : '.join(spin)} |** 🎰\nNo match. You lost **{bet:,} DDR**."
-    await interaction.response.send_message(msg)
+    multiplier = 0
+    if s1 == s2 == s3:
+        if s1 == "7️⃣": multiplier = 40
+        elif s1 == "💎": multiplier = 20
+        else: multiplier = 6
+    elif s1 == s2 or s2 == s3 or s1 == s3:
+        multiplier = 1.5
 
 @bot.tree.command(name="roulette", description="Bet on the casino roulette wheel (Red 2x, Black 2x, or Green 14x).")
 @app_commands.choices(choice=[
