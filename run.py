@@ -168,7 +168,7 @@ class PackBot(commands.Bot):
         self.process_army_upkeep.start()
         print(f"--- PACKBOT IS ONLINE ---\n")
 
-    STOCK_CHANNEL_ID = 1522622210542407750 
+    STOCK_CHANNEL_ID = 1535568224500977684 
 
     @tasks.loop(hours=0.5)
     async def update_stock_prices(self):
@@ -215,7 +215,6 @@ class PackBot(commands.Bot):
 
     @tasks.loop(hours=1.0)
     async def process_army_upkeep(self):
-        """Automatically deducts hourly upkeep. Allows balance to go negative (debt)."""
         now = time.time()
         for uid, data in self.db["economy"].items():
             if not isinstance(data, dict): continue
@@ -225,7 +224,6 @@ class PackBot(commands.Bot):
             pz = data.get("panzers", 0)
             upkeep = (inf * 2) + (art * 6) + (pz * 12)
             
-            # Check for active rations buff
             if "rations" in data.get("buffs", {}) and now < data["buffs"]["rations"]:
                 upkeep = int(upkeep * 0.5)
                 
@@ -348,7 +346,7 @@ class SmuggleView(discord.ui.View):
         else:
             fine = random.randint(50, 150)
             uid = bot._init_user(self.user.id)
-            bot.db["economy"][uid]["balance"] -= fine # Can cause debt
+            bot.db["economy"][uid]["balance"] -= fine 
             save_data(bot.db)
             embed = discord.Embed(title="🚨 MP Ambush!", color=0xe74c3c)
             embed.description = f"The Military Police caught your convoy! You lost your goods and paid a fine of **{fine} DDR**."
@@ -484,7 +482,7 @@ def build_help_embed(user_id):
     embed = discord.Embed(title="Bot Commands menu", color=0x2b2d31, description="Prefix usage: `+p <command>` or standard Slash Commands.")
     embed.add_field(
         name="💰 Economy & Income", 
-        value="`/daily` - Claim free daily cash\n`/work` - Logistics math assignment\n`/crime` - Risky street crime\n`/smuggle` - Black market contraband runs\n`/scavenge` - Search for relics to sell\n`/beg` - Ask for pocket change\n`/salary` - Claim officer stipend (4h)\n`/balance` - Check bank & assets\n`/gift <user> <amount>` - Transfer funds\n`/loan <action>` - Borrow or repay cash\n`/shop view` / `/shop buy` - Black Market buffs", 
+        value="`/daily` - Claim free daily cash\n`/work` - Logistics math assignment\n`/crime` - Risky street crime\n`/smuggle` - Black market contraband runs\n`/scavenge` - Search for relics to sell\n`/beg` - Ask for pocket change\n`/salary` - Claim officer stipend (4h)\n`/balance` - Check bank & assets\n`/leaderboard` - Server cash & military rankings\n`/gift <user> <amount>` - Transfer funds\n`/loan <action>` - Borrow or repay cash\n`/shop view` / `/shop buy` - Black Market buffs", 
         inline=False
     )
     embed.add_field(
@@ -504,7 +502,7 @@ def build_help_embed(user_id):
     )
     embed.add_field(name="🤖 AI Systems", value="`/pack`, `/glaze`, `/lobotomy`, `/lawyer`, `/ask`", inline=False)
     if user_id == MY_ID:
-        embed.add_field(name="⚙️ Owner Settings", value="`/admin ban`, `/admin unban`, `/admin wipe_army`, `/award`, `/stock set`", inline=False)
+        embed.add_field(name="⚙️ Owner Settings", value="`/admin ban`, `/admin unban`, `/admin wipe_army`, `/award`, `/stock set`, `/downtime`, `/blacklist`", inline=False)
     return embed
 
 # --- PREFIX COMMAND MATRIX ---
@@ -573,6 +571,47 @@ async def award_slash(interaction: discord.Interaction, target: discord.User, am
     bot.db["economy"][uid][currency.value] += amount
     save_data(bot.db)
     await interaction.response.send_message(f"Spawned {amount} {currency.name} for {target.mention}.")
+
+@bot.tree.command(name="leaderboard", description="View server ranking status for Cash and Military Power.")
+async def leaderboard_slash(interaction: discord.Interaction):
+    sorted_cash = sorted(bot.db["economy"].items(), key=lambda x: x[1].get("balance", 0), reverse=True)[:10]
+    
+    power_list = []
+    for uid, data in bot.db["economy"].items():
+        power = (data.get("infantry", 0) * 5) + (data.get("artillery", 0) * 16) + (data.get("panzers", 0) * 35)
+        power_list.append((uid, power))
+    sorted_power = sorted(power_list, key=lambda x: x[1], reverse=True)[:10]
+    
+    cash_lines = [f"`#{i+1}` <@{uid}> - **{data.get('balance', 0)} DDR**" for i, (uid, data) in enumerate(sorted_cash)]
+    power_lines = [f"`#{i+1}` <@{uid}> - **{pwr} Strength**" for i, (uid, pwr) in enumerate(sorted_power)]
+    
+    embed = discord.Embed(title="🏆 Server Rankings", color=0x2b2d31)
+    embed.add_field(name="💰 Richest Players (DDR)", value="\n".join(cash_lines) or "Empty.", inline=True)
+    embed.add_field(name="⚔️ Mightiest Armies", value="\n".join(power_lines) or "Empty.", inline=True)
+    
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="help", description="View lists of all working commands.")
+async def help_slash(interaction: discord.Interaction):
+    await interaction.response.send_message(embed=build_help_embed(interaction.user.id))
+
+@bot.tree.command(name="downtime", description="Freeze AI bot systems (Owner Only).")
+async def downtime_slash(interaction: discord.Interaction):
+    if interaction.user.id != MY_ID: return await interaction.response.send_message("Denied.", ephemeral=True)
+    bot.downtime = not bot.downtime
+    await interaction.response.send_message(f"AI functions: **{'Disabled' if bot.downtime else 'Enabled'}**")
+
+@bot.tree.command(name="blacklist", description="Block a user from requesting AI tasks (Owner Only).")
+async def blacklist_slash(interaction: discord.Interaction, target: discord.User):
+    if interaction.user.id != MY_ID: return await interaction.response.send_message("Denied.", ephemeral=True)
+    if target.id in bot.db["blacklist"]:
+        bot.db["blacklist"].remove(target.id)
+        msg = f"Allowed {target.name}."
+    else:
+        bot.db["blacklist"].append(target.id)
+        msg = f"Blocked {target.name}."
+    save_data(bot.db)
+    await interaction.response.send_message(msg)
 
 # --- STOCK MARKET ---
 stock_group = app_commands.Group(name="stock", description="Interact with the Duducoin Stock Market.")
@@ -790,7 +829,6 @@ def apply_casualties(user_data, severity, is_defense=False):
     elif severity == "medium": losses = random.uniform(0.06, 0.15)
     else: losses = random.uniform(0.15, 0.35)
     
-    # Defensive bunker buff
     if is_defense and "bunker" in user_data.get("buffs", {}) and time.time() < user_data["buffs"]["bunker"]:
         losses *= 0.70 
         
@@ -832,7 +870,7 @@ async def war_campaign(interaction: discord.Interaction):
     bot.db["economy"][uid]["last_campaign"] = now
     if random.random() < 0.85:
         spoils = random.randint(150, 300) + int(atk * 1.5)
-        if strat == "Artillery Barrage": spoils = int(spoils * 0.8) # Destroyed loot
+        if strat == "Artillery Barrage": spoils = int(spoils * 0.8)
         bot.db["economy"][uid]["balance"] += spoils
         losses = apply_casualties(bot.db["economy"][uid], "light")
         save_data(bot.db)
@@ -861,7 +899,6 @@ async def war_attack(interaction: discord.Interaction, target: discord.User):
     if at_atk == 0: return await interaction.response.send_message("You lack an army!", ephemeral=True)
     if t_data["balance"] < 100: return await interaction.response.send_message("Target is too poor.", ephemeral=True)
         
-    # RNG Roll +/- 15%
     at_roll = at_atk * random.uniform(0.85, 1.15)
     df_roll = df_def * random.uniform(0.85, 1.15)
     
@@ -885,7 +922,6 @@ async def war_attack(interaction: discord.Interaction, target: discord.User):
         embed.add_field(name="Attacker Casualties", value=at_loss, inline=False)
         embed.add_field(name="Defender Casualties", value=df_loss, inline=False)
     else:
-        # Defender wins
         reparations = min(u_data["balance"], int(t_data["balance"] * 0.10))
         if reparations > 0:
             u_data["balance"] -= reparations
@@ -1046,7 +1082,6 @@ async def balance(interaction: discord.Interaction):
     embed = discord.Embed(title="🏦 Bank Ledger", color=0xf1c40f)
     embed.add_field(name="User", value=interaction.user.mention, inline=False)
     
-    # Format balance (Red if in debt)
     bal_str = f"**{bal} DDR**" if bal >= 0 else f"**🛑 {bal} DDR (IN DEBT)**"
     embed.add_field(name="Cash Balance", value=bal_str, inline=True)
     embed.add_field(name="Stocks", value=f"`{shares} DUDU`", inline=True)
