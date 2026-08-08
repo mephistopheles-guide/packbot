@@ -223,7 +223,7 @@ class PackBot(commands.Bot):
         print(f"--- PACKBOT IS ONLINE ---\n")
 
     # Replace with your actual Channel ID
-    STOCK_CHANNEL_ID = 1522622210542407750 
+    STOCK_CHANNEL_ID = 1535568224500977684
 
     @tasks.loop(hours=0.5)
     async def update_stock_prices(self):
