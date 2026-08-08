@@ -90,7 +90,6 @@ HIJACK_PHRASES = [
 
 INSULTS = ["bum", "clown", "fraud", "loser", "troglodyte", "oxygen thief", "mistake"]
 
-# Removed hack_tool from shop items
 SHOP_ITEMS = {
     "padlock": {
         "name": "🔒 Padlock",
@@ -119,16 +118,39 @@ SHOP_ITEMS = {
     }
 }
 
+# --- EXPANDED 29-BUILDING CATALOG ---
 CITY_BUILDINGS = {
-    "factory":         {"name": "🏭 Manufacturing Factory", "cost": 800,  "output": 150, "type": "civilian", "desc": "Base industrial output (+150 DDR/hr)."},
-    "tech_park":       {"name": "🖥️ Innovation Tech Park",  "cost": 1800, "output": 300, "type": "civilian", "desc": "Advanced technology center (+300 DDR/hr)."},
-    "trade_port":      {"name": "🚢 Global Shipping Port",  "cost": 3200, "output": 450, "type": "civilian", "desc": "International trade terminal (+450 DDR/hr)."},
-    "power_grid":      {"name": "⚡ High-Voltage Power Grid","cost": 2500, "output": 0,   "type": "civilian", "desc": "Boosts all industrial production by +15%."},
-    "housing":         {"name": "🏘️ Residential Housing",   "cost": 600,  "output": 60,  "type": "civilian", "desc": "Expands population and tax revenue (+60 DDR/hr)."},
-    "barracks":        {"name": "🪖 Municipal Army Barracks","cost": 1000, "output": 40,  "type": "military", "desc": "Low revenue (+40/hr), but reduces Infantry recruit cost by -10%."},
-    "munitions_plant": {"name": "💥 Heavy Munitions Plant", "cost": 2000, "output": 80,  "type": "military", "desc": "Low revenue (+80/hr), but reduces Tank & Artillery cost by -10%."},
-    "airbase":         {"name": "✈️ Tactical Airforce Base", "cost": 3500, "output": 110, "type": "military", "desc": "Low revenue (+110/hr), but reduces Bomber & Flak cost by -15%."},
-    "fortified_depot": {"name": "🏰 Fortified Supply Depot", "cost": 1500, "output": 50,  "type": "military", "desc": "Low revenue (+50/hr), but shields municipal buildings during war raids."}
+    # Original Industrial & Military
+    "factory":         {"name": "🏭 Manufacturing Factory",   "emoji": "🏭", "cost": 800,  "output": 150, "pop": 0,    "hap": 0,  "type": "civilian", "desc": "Base industrial output (+150 DDR/hr)."},
+    "tech_park":       {"name": "🖥️ Innovation Tech Park",    "emoji": "🖥️", "cost": 1800, "output": 300, "pop": 0,    "hap": 0,  "type": "civilian", "desc": "Advanced technology center (+300 DDR/hr)."},
+    "trade_port":      {"name": "🚢 Global Shipping Port",    "emoji": "🚢", "cost": 3200, "output": 450, "pop": 0,    "hap": 0,  "type": "civilian", "desc": "International trade terminal (+450 DDR/hr)."},
+    "power_grid":      {"name": "⚡ High-Voltage Power Grid",  "emoji": "⚡", "cost": 2500, "output": 0,   "pop": 0,    "hap": 0,  "type": "civilian", "desc": "Boosts industrial production by +15% (Max 50)."},
+    "housing":         {"name": "🏘️ Residential Housing",     "emoji": "🏘️", "cost": 600,  "output": 60,  "pop": 450,  "hap": 1,  "type": "civilian", "desc": "Expands population (+450 Citizens, +1% Hap)."},
+    "barracks":        {"name": "🪖 Municipal Army Barracks",  "emoji": "🪖", "cost": 1000, "output": 40,  "pop": 0,    "hap": 0,  "type": "military", "desc": "-10% Infantry recruit cost."},
+    "munitions_plant": {"name": "💥 Heavy Munitions Plant",   "emoji": "💥", "cost": 2000, "output": 80,  "pop": 0,    "hap": 0,  "type": "military", "desc": "-10% Tank & Artillery recruit cost."},
+    "airbase":         {"name": "✈️ Tactical Airforce Base",  "emoji": "✈️", "cost": 3500, "output": 110, "pop": 0,    "hap": 0,  "type": "military", "desc": "-15% Bomber & Flak recruit cost."},
+    "fortified_depot": {"name": "🏰 Fortified Supply Depot",  "emoji": "🏰", "cost": 1500, "output": 50,  "pop": 0,    "hap": 0,  "type": "military", "desc": "Shields city buildings during war raids."},
+    # 20 New Carnival, Amusement, Civic & Commercial Items
+    "ferris_wheel":    {"name": "🎡 Giant Ferris Wheel",      "emoji": "🎡", "cost": 1200, "output": 40,  "pop": 80,   "hap": 5,  "type": "carnival", "desc": "Carnival landmark (+80 Pop, +5% Happiness)."},
+    "roller_coaster":  {"name": "🎢 Excelsior Roller Coaster","emoji": "🎢", "cost": 2200, "output": 90,  "pop": 150,  "hap": 8,  "type": "carnival", "desc": "High-thrill coaster (+150 Pop, +8% Happiness)."},
+    "circus_tent":     {"name": "🎪 Traveling Circus Tent",   "emoji": "🎪", "cost": 900,  "output": 30,  "pop": 50,   "hap": 4,  "type": "carnival", "desc": "Family entertainment (+50 Pop, +4% Happiness)."},
+    "carousel":        {"name": "🎠 Classic Carousel",        "emoji": "🎠", "cost": 500,  "output": 15,  "pop": 30,   "hap": 2,  "type": "carnival", "desc": "Whimsical ride (+30 Pop, +2% Happiness)."},
+    "haunted_house":   {"name": "👻 Spooky Haunted House",    "emoji": "👻", "cost": 800,  "output": 25,  "pop": 40,   "hap": 3,  "type": "carnival", "desc": "Spooky attraction (+40 Pop, +3% Happiness)."},
+    "arcade":          {"name": "🕹️ Retro Neon Arcade",       "emoji": "🕹️", "cost": 750,  "output": 35,  "pop": 60,   "hap": 3,  "type": "carnival", "desc": "Gaming hub (+60 Pop, +3% Happiness)."},
+    "water_park":      {"name": "🌊 Splash Water Park",       "emoji": "🌊", "cost": 1900, "output": 75,  "pop": 120,  "hap": 6,  "type": "carnival", "desc": "Summer paradise (+120 Pop, +6% Happiness)."},
+    "fireworks_stand": {"name": "🎆 Fireworks Showground",    "emoji": "🎆", "cost": 1100, "output": 20,  "pop": 70,   "hap": 4,  "type": "carnival", "desc": "Nightly displays (+70 Pop, +4% Happiness)."},
+    "park":            {"name": "🌳 Central Urban Park",      "emoji": "🌳", "cost": 700,  "output": 10,  "pop": 100,  "hap": 3,  "type": "civic",    "desc": "Green space (+100 Pop, +3% Happiness)."},
+    "stadium":         {"name": "🏟️ Grand City Stadium",      "emoji": "🏟️", "cost": 3000, "output": 120, "pop": 500,  "hap": 10, "type": "civic",    "desc": "Sports arena (+500 Pop, +10% Happiness)."},
+    "museum":          {"name": "🏛️ National Museum",         "emoji": "🏛️", "cost": 1600, "output": 50,  "pop": 200,  "hap": 4,  "type": "civic",    "desc": "Cultural center (+200 Pop, +4% Happiness)."},
+    "hospital":        {"name": "🏥 Municipal Hospital",      "emoji": "🏥", "cost": 2400, "output": 40,  "pop": 400,  "hap": 5,  "type": "civic",    "desc": "Healthcare infrastructure (+400 Pop, +5% Hap)."},
+    "school":          {"name": "🏫 City Science Academy",    "emoji": "🏫", "cost": 1500, "output": 30,  "pop": 300,  "hap": 3,  "type": "civic",    "desc": "Education institute (+300 Pop, +3% Happiness)."},
+    "statue":          {"name": "🗽 Founder Monument Statue", "emoji": "🗽", "cost": 650,  "output": 5,   "pop": 50,   "hap": 2,  "type": "civic",    "desc": "Civic pride monument (+50 Pop, +2% Happiness)."},
+    "fountain":        {"name": "⛲ Plaza Diamond Fountain",  "emoji": "⛲", "cost": 450,  "output": 5,   "pop": 40,   "hap": 1,  "type": "civic",    "desc": "Plaza centerpiece (+40 Pop, +1% Happiness)."},
+    "cinema":          {"name": "🍿 Grand Movie Theater",     "emoji": "🍿", "cost": 950,  "output": 45,  "pop": 110,  "hap": 3,  "type": "civic",    "desc": "Film theater (+110 Pop, +3% Happiness)."},
+    "mall":            {"name": "🏬 Mega Shopping Mall",      "emoji": "🏬", "cost": 2600, "output": 200, "pop": 350,  "hap": 5,  "type": "civilian", "desc": "Commercial hub (+350 Pop, +5% Hap, +200/hr)."},
+    "casino":          {"name": "🎰 Municipal Golden Casino", "emoji": "🎰", "cost": 3100, "output": 350, "pop": 200,  "hap": -2, "type": "civilian", "desc": "High revenue (+350/hr), but -2% Happiness."},
+    "tv_station":      {"name": "📡 Broadcast Media Tower",   "emoji": "📡", "cost": 1400, "output": 60,  "pop": 150,  "hap": 3,  "type": "civic",    "desc": "News & media network (+150 Pop, +3% Hap)."},
+    "observatory":     {"name": "🔭 Space Observatory",       "emoji": "🔭", "cost": 1850, "output": 55,  "pop": 180,  "hap": 4,  "type": "civic",    "desc": "Stargazing dome (+180 Pop, +4% Happiness)."}
 }
 
 class PackBot(commands.Bot):
@@ -198,8 +220,6 @@ class PackBot(commands.Bot):
     # --- FOOLPROOF DIMINISHING RETURNS WEALTH SCALER ---
     def get_scaled_payout(self, user_id, base_min, base_max):
         bal = self.get_balance(user_id)
-        # Higher balance = lower multiplier to prevent the rich from compounding infinitely fast
-        # Newcomers get full power (multiplier ~ 1.0 to 1.5), rich players taper down towards 0.25
         multiplier = max(0.25, 1.0 / (1.0 + (bal / 15000.0)))
         reward = int(random.randint(base_min, base_max) * multiplier)
         return max(15, reward)
@@ -564,7 +584,6 @@ class MultiplayerBlackjackView(discord.ui.View):
         self.deck = [{'rank': r, 'suit': s, 'val': 10 if r in ['J','Q','K'] else (11 if r=='A' else int(r))} for s in suits for r in ranks]
         random.shuffle(self.deck)
         self.dealer_hand = [self.deck.pop(), self.deck.pop()]
-        # Deal initial cards to host
         self.players[host.id]["hand"] = [self.deck.pop(), self.deck.pop()]
 
     def calc(self, hand):
@@ -613,7 +632,6 @@ class MultiplayerBlackjackView(discord.ui.View):
         if self.calc(pdata["hand"]) > 21:
             pdata["stood"] = True
             
-        # Check if all players finished
         if all(p["stood"] for p in self.players.values()):
             await self.resolve_game(interaction)
         else:
@@ -660,18 +678,23 @@ class MultiplayerBlackjackView(discord.ui.View):
 def build_help_embed(user_id):
     embed = discord.Embed(title="PackBot Systems & Command Matrix", color=0x2b2d31, description="Use `/` slash commands or prefix `+p <command>` to interact.")
     embed.add_field(
-        name="🏙️ Cities & Industry",
+        name="🏙️ Cities, Plots & Industry",
         value="`/city found <name>` - Establish a new industrial municipality\n"
               "`/city info [user]` - View city population, happiness, and infrastructure\n"
-              "`/city build <building>` - Construct civilian factories OR military barracks/depots\n"
+              "`/city map [user]` - Render your interactive emoji city plot grid\n"
+              "`/city expand` - Purchase adjacent land grants to expand your grid size\n"
+              "`/city place <x> <y> <building>` - Place any owned building onto your plot map\n"
+              "`/city demonym <title>` - Give your citizens a custom name (e.g. 'Gothamites')\n"
+              "`/city build <building>` - Construct factories, carnival items, parks, or barracks\n"
               "`/city garrison` - View how your city buildings support & discount your army\n"
-              "`/city collect` - Harvest accumulated municipal tax & factory revenue\n"
+              "`/city collect` - Harvest accumulated municipal tax & factory revenue (0 Cooldown!)\n"
               "`/city invest <amount>` - Fund city R&D to upgrade your production multiplier",
         inline=False
     )
     embed.add_field(
         name="💰 Economy & Quick Cash", 
-        value="`/beg` - Instant low-tier cash with 0 cooldown\n"
+        value="`/cd` - View all active personal and military cooldown timers\n"
+              "`/beg` - Instant low-tier cash with 0 cooldown\n"
               "`/salvage` - Scavenge municipal scrap yards for steady cash\n"
               "`/scavenge` - Explore urban zones for quick cash\n"
               "`/daily` - Claim your municipal daily dividend (1,000 DDR)\n"
@@ -697,6 +720,8 @@ def build_help_embed(user_id):
     embed.add_field(
         name="🌍 Warfare & Factions", 
         value="`/army create <name>` - Found a military regime\n"
+              "`/army rename <name>` - Rename your Military Regime\n"
+              "`/army rename_squadron <unit> <custom_name>` - Customize division titles\n"
               "`/army info [name] [user]` - Inspect garrison forces and doctrine\n"
               "`/army recruit <unit> <count>` - Enlist combat units (with city barracks discounts!)\n"
               "`/army deposit <amount>` - Fund your regime's war treasury\n"
@@ -880,13 +905,26 @@ async def blacklist_slash(interaction: discord.Interaction, target: discord.User
 city_group = app_commands.Group(name="city", description="Establish industrial municipalities, construct factories, and support your army.")
 bot.tree.add_command(city_group)
 
-def get_city_production(city_data):
+def get_city_stats(city_data):
     bldgs = city_data.get("buildings", {})
+    # Base pop 1000 + housing/carnival/civic bonuses
+    pop = 1000 + sum(bldgs.get(b, 0) * CITY_BUILDINGS[b]["pop"] for b in CITY_BUILDINGS)
+    # Happiness starts at 50%, capped at 100%
+    hap_bonus = sum(bldgs.get(b, 0) * CITY_BUILDINGS[b]["hap"] for b in CITY_BUILDINGS)
+    hap = min(100, max(10, 50 + hap_bonus))
+    
+    # Revenue = building output + tax revenue (0.15 per citizen)
     base_output = sum(bldgs.get(b, 0) * CITY_BUILDINGS[b]["output"] for b in CITY_BUILDINGS)
-    grid_bonus = 1.0 + (bldgs.get("power_grid", 0) * 0.15)
+    tax_revenue = int(pop * 0.15)
+    
+    grid_bonus = 1.0 + (min(50, bldgs.get("power_grid", 0)) * 0.15)
     rd_mult = city_data.get("rd_multiplier", 1.0)
-    total_hourly = int(base_output * grid_bonus * rd_mult)
-    return total_hourly
+    
+    # Happiness is relevant! Scales all output: 100% happiness = x1.5 revenue
+    happiness_multiplier = 0.5 + (hap / 100.0)
+    
+    total_hourly = int((base_output + tax_revenue) * grid_bonus * rd_mult * happiness_multiplier)
+    return pop, hap, total_hourly
 
 def get_city_military_discounts(city_data):
     bldgs = city_data.get("buildings", {})
@@ -903,44 +941,122 @@ async def city_found(interaction: discord.Interaction, name: str):
     bot.update_balance(interaction.user.id, -2000)
     bot.db["cities"][uid] = {
         "name": name.strip(),
+        "demonym": "Citizens",
         "owner_id": str(interaction.user.id),
-        "population": 1000,
-        "happiness": 85,
         "rd_multiplier": 1.0,
-        "buildings": {"factory": 1, "tech_park": 0, "trade_port": 0, "power_grid": 0, "housing": 2, "barracks": 0, "munitions_plant": 0, "airbase": 0, "fortified_depot": 0},
+        "buildings": {"factory": 1, "housing": 2},
+        "grid_size": 4,
+        "grid_layout": {},
         "last_collected": time.time(),
         "rd_invested": 0
     }
     save_data(bot.db)
     embed = discord.Embed(title="🏙️ NEW MUNICIPAL CHARTER ESTABLISHED", color=0x3498db)
-    embed.description = f"**Municipality:** {name.strip()}\n**Mayor:** {interaction.user.mention}\n\n*Starting Infrastructure:* `1x Factory`, `2x Housing District`\n*Base Production:* `270 DDR/hr`"
+    embed.description = f"**Municipality:** {name.strip()}\n**Mayor:** {interaction.user.mention}\n**Citizen Title:** Citizens\n**Starting Grid Plot:** `4x4`\n\n*Starting Infrastructure:* `1x Factory`, `2x Housing District`"
     await interaction.response.send_message(embed=embed)
 
-@city_group.command(name="info", description="Inspect municipal infrastructure, population, and hourly revenue.")
+@city_group.command(name="demonym", description="Give your city's citizens a custom title (e.g. 'Gothamites').")
+async def city_demonym(interaction: discord.Interaction, title: str):
+    uid = bot._init_user(interaction.user.id)
+    if uid not in bot.db["cities"]: return await interaction.response.send_message("Found a city first!", ephemeral=True)
+    bot.db["cities"][uid]["demonym"] = title.strip()
+    save_data(bot.db)
+    await interaction.response.send_message(f"👥 Citizens of **{bot.db['cities'][uid]['name']}** are now known as **{title.strip()}**!")
+
+@city_group.command(name="info", description="Inspect municipal infrastructure, population, happiness, and hourly revenue.")
 async def city_info(interaction: discord.Interaction, target_user: discord.User = None):
     uid = bot._init_user(target_user.id if target_user else interaction.user.id)
     if uid not in bot.db["cities"]:
         return await interaction.response.send_message("This player has not established an industrial city yet.", ephemeral=True)
     city = bot.db["cities"][uid]
     bldgs = city.get("buildings", {})
-    hourly = get_city_production(city)
+    pop, hap, hourly = get_city_stats(city)
     
     elapsed_hours = min(12.0, max(0.0, (time.time() - city["last_collected"]) / 3600.0))
     accumulated = int(hourly * elapsed_hours)
     
     embed = discord.Embed(title=f"🏙️ MUNICIPALITY OF {city['name'].upper()}", color=0x3498db)
     embed.add_field(name="Mayor", value=f"<@{city['owner_id']}>", inline=True)
-    embed.add_field(name="Population", value=f"**{city['population']:,}** citizens", inline=True)
-    embed.add_field(name="Happiness Index", value=f"**{city['happiness']}%** approval", inline=True)
-    embed.add_field(name="Industrial Revenue Rate", value=f"**{hourly:,} DDR / hr**", inline=True)
-    embed.add_field(name="R&D Tech Multiplier", value=f"`x{city.get('rd_multiplier', 1.0):.2f}` bonus", inline=True)
+    embed.add_field(name="Citizen Demonym", value=f"**{city.get('demonym', 'Citizens')}**", inline=True)
+    embed.add_field(name="Population", value=f"**{pop:,}** citizens", inline=True)
+    embed.add_field(name="Happiness Index", value=f"**{hap}%** (`x{0.5+(hap/100.0):.2f}` Revenue Mult)", inline=True)
+    embed.add_field(name="Total Revenue Rate", value=f"**{hourly:,} DDR / hr**", inline=True)
     embed.add_field(name="Unclaimed Treasury Vault", value=f"**{accumulated:,} DDR** ready to collect", inline=True)
     
-    civilian_lines = [f"• **{CITY_BUILDINGS[b]['name']}:** `{bldgs.get(b, 0)}`" for b in CITY_BUILDINGS if CITY_BUILDINGS[b]["type"]=="civilian"]
-    military_lines = [f"• **{CITY_BUILDINGS[b]['name']}:** `{bldgs.get(b, 0)}`" for b in CITY_BUILDINGS if CITY_BUILDINGS[b]["type"]=="military"]
-    embed.add_field(name="Civilian Industry", value="\n".join(civilian_lines), inline=True)
-    embed.add_field(name="Military Support Installations", value="\n".join(military_lines) or "None", inline=True)
+    carnival_lines = [f"• **{CITY_BUILDINGS[b]['name']}:** `{bldgs.get(b, 0)}`" for b in CITY_BUILDINGS if CITY_BUILDINGS[b]["type"]=="carnival" and bldgs.get(b, 0)>0]
+    civic_lines = [f"• **{CITY_BUILDINGS[b]['name']}:** `{bldgs.get(b, 0)}`" for b in CITY_BUILDINGS if CITY_BUILDINGS[b]["type"]=="civic" and bldgs.get(b, 0)>0]
+    civ_lines = [f"• **{CITY_BUILDINGS[b]['name']}:** `{bldgs.get(b, 0)}`" for b in CITY_BUILDINGS if CITY_BUILDINGS[b]["type"]=="civilian" and bldgs.get(b, 0)>0]
+    mil_lines = [f"• **{CITY_BUILDINGS[b]['name']}:** `{bldgs.get(b, 0)}`" for b in CITY_BUILDINGS if CITY_BUILDINGS[b]["type"]=="military" and bldgs.get(b, 0)>0]
+    
+    if civ_lines: embed.add_field(name="Civilian & Industry", value="\n".join(civ_lines), inline=True)
+    if carnival_lines: embed.add_field(name="Carnival & Amusement", value="\n".join(carnival_lines), inline=True)
+    if civic_lines: embed.add_field(name="Civic & Public Services", value="\n".join(civic_lines), inline=True)
+    if mil_lines: embed.add_field(name="Military Support", value="\n".join(mil_lines), inline=True)
+    
     await interaction.response.send_message(embed=embed)
+
+@city_group.command(name="map", description="Render your interactive city plot grid map.")
+async def city_map(interaction: discord.Interaction, target_user: discord.User = None):
+    uid = bot._init_user(target_user.id if target_user else interaction.user.id)
+    if uid not in bot.db["cities"]: return await interaction.response.send_message("City not found.", ephemeral=True)
+    city = bot.db["cities"][uid]
+    grid_size = city.get("grid_size", 4)
+    layout = city.get("grid_layout", {})
+    
+    grid_rows = []
+    for y in range(grid_size):
+        row_cells = []
+        for x in range(grid_size):
+            coord = f"{x},{y}"
+            if coord in layout and layout[coord] in CITY_BUILDINGS:
+                row_cells.append(CITY_BUILDINGS[layout[coord]]["emoji"])
+            else:
+                row_cells.append("⬛")
+        grid_rows.append("".join(row_cells))
+        
+    map_str = "\n".join(grid_rows)
+    embed = discord.Embed(title=f"🗺️ PLOT MAP: {city['name'].upper()} ({grid_size}x{grid_size})", color=0x2ecc71)
+    embed.description = f"{map_str}\n\n*Use `/city place <x> <y> <building>` to place owned structures onto your grid plot!*\n*Use `/city expand` to buy larger borders (Max 8x8).* "
+    await interaction.response.send_message(embed=embed)
+
+@city_group.command(name="expand", description="Purchase adjacent land grants to expand your grid map size.")
+async def city_expand(interaction: discord.Interaction):
+    uid = bot._init_user(interaction.user.id)
+    if uid not in bot.db["cities"]: return await interaction.response.send_message("Found a city first!", ephemeral=True)
+    city = bot.db["cities"][uid]
+    size = city.get("grid_size", 4)
+    if size >= 8: return await interaction.response.send_message("Your municipality has reached the maximum **8x8** metropolitan size limit!", ephemeral=True)
+    cost = size * 1500
+    if bot.get_balance(interaction.user.id) < cost:
+        return await interaction.response.send_message(f"Expanding city plot to **{size+1}x{size+1}** requires **{cost:,} DDR**.", ephemeral=True)
+    bot.update_balance(interaction.user.id, -cost)
+    city["grid_size"] = size + 1
+    save_data(bot.db)
+    await interaction.response.send_message(f"🗺️ Expanded municipal plot map to **{size+1}x{size+1}** for **{cost:,} DDR**!")
+
+@city_group.command(name="place", description="Place an owned building onto specific grid coordinates (0 to grid_size - 1).")
+async def city_place(interaction: discord.Interaction, x: int, y: int, building: str):
+    uid = bot._init_user(interaction.user.id)
+    if uid not in bot.db["cities"]: return await interaction.response.send_message("Found a city first!", ephemeral=True)
+    city = bot.db["cities"][uid]
+    size = city.get("grid_size", 4)
+    if x < 0 or x >= size or y < 0 or y >= size:
+        return await interaction.response.send_message(f"Coordinates ({x}, {y}) are outside your **{size}x{size}** city plot!", ephemeral=True)
+    
+    b_key = building.strip().lower()
+    if b_key not in CITY_BUILDINGS:
+        return await interaction.response.send_message("Invalid building ID. Check `/city build` for names.", ephemeral=True)
+        
+    owned = city.get("buildings", {}).get(b_key, 0)
+    layout = city.setdefault("grid_layout", {})
+    placed_count = sum(1 for v in layout.values() if v == b_key)
+    
+    if placed_count >= owned:
+        return await interaction.response.send_message(f"You have already placed all `{owned}x` of your **{CITY_BUILDINGS[b_key]['name']}** on the map! Build more via `/city build`.", ephemeral=True)
+        
+    layout[f"{x},{y}"] = b_key
+    save_data(bot.db)
+    await interaction.response.send_message(f"📍 Placed **{CITY_BUILDINGS[b_key]['name']}** at coordinate `({x}, {y})` on your `/city map`!")
 
 @city_group.command(name="garrison", description="View how your municipal military installations support and discount your army.")
 async def city_garrison(interaction: discord.Interaction):
@@ -958,47 +1074,58 @@ async def city_garrison(interaction: discord.Interaction):
     embed.add_field(name="Fortified Supply Depot", value=f"`{bldgs.get('fortified_depot',0)}x Built` | Active Raid Defense Shielding", inline=False)
     await interaction.response.send_message(embed=embed)
 
-@city_group.command(name="build", description="Construct industrial buildings or military support installations.")
+@city_group.command(name="build", description="Construct industrial, carnival, civic, or military structures.")
 @app_commands.choices(building=[
-    app_commands.Choice(name="Manufacturing Factory (800 DDR | +150/hr)", value="factory"),
-    app_commands.Choice(name="Innovation Tech Park (1,800 DDR | +300/hr)", value="tech_park"),
-    app_commands.Choice(name="Global Shipping Port (3,200 DDR | +450/hr)", value="trade_port"),
-    app_commands.Choice(name="High-Voltage Power Grid (2,500 DDR | +15% Output)", value="power_grid"),
-    app_commands.Choice(name="Residential Housing (600 DDR | +60/hr)", value="housing"),
-    app_commands.Choice(name="🪖 Army Barracks (1,000 DDR | +40/hr | -10% Infantry Cost)", value="barracks"),
-    app_commands.Choice(name="💥 Munitions Plant (2,000 DDR | +80/hr | -10% Tank/Artillery Cost)", value="munitions_plant"),
-    app_commands.Choice(name="✈️ Tactical Airbase (3,500 DDR | +110/hr | -15% Bomber/Flak Cost)", value="airbase"),
-    app_commands.Choice(name="🏰 Fortified Depot (1,500 DDR | +50/hr | Raid Defense Shield)", value="fortified_depot")
+    app_commands.Choice(name="🏭 Manufacturing Factory (800 DDR | +150/hr)", value="factory"),
+    app_commands.Choice(name="🖥️ Innovation Tech Park (1,800 DDR | +300/hr)", value="tech_park"),
+    app_commands.Choice(name="🚢 Global Shipping Port (3,200 DDR | +450/hr)", value="trade_port"),
+    app_commands.Choice(name="⚡ Power Grid (2,500 DDR | +15% Output | Max 50)", value="power_grid"),
+    app_commands.Choice(name="🏘️ Residential Housing (600 DDR | +450 Citizens)", value="housing"),
+    app_commands.Choice(name="🎡 Giant Ferris Wheel (1,200 DDR | +80 Pop | +5% Hap)", value="ferris_wheel"),
+    app_commands.Choice(name="🎢 Excelsior Roller Coaster (2,200 DDR | +150 Pop | +8% Hap)", value="roller_coaster"),
+    app_commands.Choice(name="🎪 Traveling Circus Tent (900 DDR | +50 Pop | +4% Hap)", value="circus_tent"),
+    app_commands.Choice(name="🌊 Splash Water Park (1,900 DDR | +120 Pop | +6% Hap)", value="water_park"),
+    app_commands.Choice(name="🏟️ Grand City Stadium (3,000 DDR | +500 Pop | +10% Hap)", value="stadium"),
+    app_commands.Choice(name="🏛️ National Museum (1,600 DDR | +200 Pop | +4% Hap)", value="museum"),
+    app_commands.Choice(name="🏥 Municipal Hospital (2,400 DDR | +400 Pop | +5% Hap)", value="hospital"),
+    app_commands.Choice(name="🏬 Mega Shopping Mall (2,600 DDR | +350 Pop | +200/hr)", value="mall"),
+    app_commands.Choice(name="🎰 Golden Casino (3,100 DDR | +350/hr | -2% Hap)", value="casino"),
+    app_commands.Choice(name="🪖 Army Barracks (1,000 DDR | -10% Infantry Cost)", value="barracks"),
+    app_commands.Choice(name="💥 Munitions Plant (2,000 DDR | -10% Tank/Artillery Cost)", value="munitions_plant"),
+    app_commands.Choice(name="✈️ Tactical Airbase (3,500 DDR | -15% Bomber/Flak Cost)", value="airbase")
 ])
 async def city_build(interaction: discord.Interaction, building: app_commands.Choice[str], count: int = 1):
     if count <= 0: return await interaction.response.send_message("Invalid construction count.", ephemeral=True)
     uid = bot._init_user(interaction.user.id)
     if uid not in bot.db["cities"]: return await interaction.response.send_message("Establish a city first using `/city found`.", ephemeral=True)
     b_key = building.value
+    
+    current_built = bot.db["cities"][uid]["buildings"].get(b_key, 0)
+    if b_key == "power_grid" and current_built + count > 50:
+        return await interaction.response.send_message("⚠️ **High-Voltage Power Grids** are strictly limited to **50 maximum per city**!", ephemeral=True)
+        
     cost = CITY_BUILDINGS[b_key]["cost"] * count
     if bot.get_balance(interaction.user.id) < cost:
         return await interaction.response.send_message(f"Constructing `{count}x` **{CITY_BUILDINGS[b_key]['name']}** requires **{cost:,} DDR**.", ephemeral=True)
     bot.update_balance(interaction.user.id, -cost)
-    bot.db["cities"][uid]["buildings"][b_key] = bot.db["cities"][uid]["buildings"].get(b_key, 0) + count
-    if b_key == "housing": bot.db["cities"][uid]["population"] += (450 * count)
+    bot.db["cities"][uid]["buildings"][b_key] = current_built + count
     save_data(bot.db)
-    await interaction.response.send_message(f"🏗️ Constructed `{count}x` **{CITY_BUILDINGS[b_key]['name']}** for **{cost:,} DDR**.")
+    await interaction.response.send_message(f"🏗️ Constructed `{count}x` **{CITY_BUILDINGS[b_key]['name']}** for **{cost:,} DDR**!")
 
-@city_group.command(name="collect", description="Harvest accumulated factory output and municipal tax revenue (Capped at 12 hours).")
+# --- COLLECT COMMAND (0 COOLDOWN REMOVED) ---
+@city_group.command(name="collect", description="Harvest accumulated factory output and municipal taxes (Capped at 12 hours, 0 Cooldown).")
 async def city_collect(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
     if uid not in bot.db["cities"]: return await interaction.response.send_message("You do not own a municipality.", ephemeral=True)
     city = bot.db["cities"][uid]
-    hourly = get_city_production(city)
+    _, _, hourly = get_city_stats(city)
     elapsed_hours = min(12.0, max(0.0, (time.time() - city["last_collected"]) / 3600.0))
-    if elapsed_hours < 0.25:
-        return await interaction.response.send_message("Factory production lines are still cycling. Check back later.", ephemeral=True)
     accumulated = int(hourly * elapsed_hours)
     city["last_collected"] = time.time()
     bot.update_balance(interaction.user.id, accumulated)
     save_data(bot.db)
     embed = discord.Embed(title="🏙️ MUNICIPAL REVENUE COLLECTED", color=0x2ecc71)
-    embed.description = f"Harvested **{accumulated:,} DDR** in industrial output and municipal taxes over `{elapsed_hours:.1f}` hours of production."
+    embed.description = f"Harvested **{accumulated:,} DDR** in industrial output and citizen taxes over `{elapsed_hours:.2f}` hours of production."
     await interaction.response.send_message(embed=embed)
 
 @city_group.command(name="invest", description="Inject capital into city R&D to upgrade your production multiplier.")
@@ -1013,6 +1140,60 @@ async def city_invest(interaction: discord.Interaction, amount: int):
     city["rd_multiplier"] = round(1.0 + (city["rd_invested"] / 5000.0) * 0.05, 3)
     save_data(bot.db)
     await interaction.response.send_message(f"🔬 Invested **{amount:,} DDR** into municipal innovation. Your R&D production multiplier is now **x{city['rd_multiplier']}**.")
+
+# --- COOLDOWNS DASHBOARD COMMAND (/cd) ---
+@bot.tree.command(name="cd", description="View all remaining personal and military cooldown timers.")
+async def cd_slash(interaction: discord.Interaction):
+    uid = bot._init_user(interaction.user.id)
+    now = time.time()
+    user_data = bot.db["economy"][uid]
+    
+    timers = {
+        "💼 Math Shift (/work)": (user_data.get("last_work", 0), 300),
+        "🕴️ Underground Heist (/crime)": (user_data.get("last_crime", 0), 180),
+        "🎯 Tactical Dispatch (/contract)": (user_data.get("last_contract", 0), 600),
+        "📦 Border Smuggle (/smuggle)": (user_data.get("last_smuggle", 0), 450),
+        "🏪 Store Shakedown (/mafia extort)": (user_data.get("last_extort", 0), 45),
+        "🛠️ Scrap Yard Salvage (/salvage)": (user_data.get("last_salvage", 0), 120),
+        "🔍 Urban Scavenge (/scavenge)": (user_data.get("last_scavenge", 0), 150),
+        "💵 Municipal Daily (/daily)": (user_data.get("last_daily", 0), 86400)
+    }
+    
+    lines = []
+    for label, (last_ts, cd_duration) in timers.items():
+        rem = int((last_ts + cd_duration) - now)
+        if rem > 0:
+            m, s = divmod(rem, 60)
+            h, m = divmod(m, 60)
+            fmt_time = f"{f'{h}h ' if h else ''}{f'{m}m ' if m else ''}{s}s"
+            lines.append(f"• **{label}:** `Wait {fmt_time.strip()}`")
+        else:
+            lines.append(f"• **{label}:** 🟢 `READY`")
+            
+    # Military Regime Cooldowns
+    mil_lines = []
+    fid = user_data.get("faction")
+    if fid and fid in bot.db["factions"]:
+        fac = bot.db["factions"][fid]
+        fac_timers = {
+            "🚀 Frontline Assault (/war raid)": (fac.get("last_raid", 0), 300),
+            "✈️ Strategic Airstrike (/war bomb)": (fac.get("last_bomb", 0), 3000),
+            "📻 Smear Campaign (/war propaganda)": (fac.get("last_propaganda", 0), 7200)
+        }
+        for label, (last_ts, cd_dur) in fac_timers.items():
+            rem = int((last_ts + cd_dur) - now)
+            if rem > 0:
+                m, s = divmod(rem, 60)
+                h, m = divmod(m, 60)
+                fmt_time = f"{f'{h}h ' if h else ''}{f'{m}m ' if m else ''}{s}s"
+                mil_lines.append(f"• **{label}:** `Wait {fmt_time.strip()}`")
+            else:
+                mil_lines.append(f"• **{label}:** 🟢 `READY`")
+                
+    embed = discord.Embed(title="⏱️ PackBot Cooldowns & Action Dashboard", color=0x3498db)
+    embed.add_field(name="Personal Action Cooldowns", value="\n".join(lines), inline=False)
+    if mil_lines: embed.add_field(name="Military Regime Cooldowns", value="\n".join(mil_lines), inline=False)
+    await interaction.response.send_message(embed=embed)
 
 # --- MAFIA SYNDICATE ENGINE ---
 mafia_group = app_commands.Group(name="mafia", description="Operate an underground Mafia Family and execute syndicate hits.")
@@ -1322,6 +1503,7 @@ async def army_create(interaction: discord.Interaction, name: str):
         "members": {str(interaction.user.id): "Commander"},
         "doctrine": "balanced",
         "army": {"infantry": 5, "tanks": 0, "artillery": 0, "bombers": 0, "flak": 0, "bunkers": 1},
+        "squadron_names": {},
         "last_raid": 0,
         "last_bomb": 0,
         "last_propaganda": 0,
@@ -1334,6 +1516,41 @@ async def army_create(interaction: discord.Interaction, name: str):
     embed.description = f"**Regime:** {name.strip()}\n**Commander:** {interaction.user.mention}\n**Alignment:** `NEUTRAL`"
     embed.add_field(name="Starting Garrison", value="• 🪖 5x Infantry\n• 🏰 1x Bunker", inline=False)
     await interaction.response.send_message(embed=embed)
+
+# --- ARMY RENAME & SQUADRON RENAME COMMANDS ---
+@army_group.command(name="rename", description="Rename your Military Regime (Commander Only).")
+async def army_rename(interaction: discord.Interaction, new_name: str):
+    uid = bot._init_user(interaction.user.id)
+    fid = bot.db["economy"][uid]["faction"]
+    if not fid: return await interaction.response.send_message("You do not command a regime.", ephemeral=True)
+    fac = bot.db["factions"][fid]
+    if fac["leader_id"] != str(interaction.user.id): return await interaction.response.send_message("Commander only!", ephemeral=True)
+    
+    old_name = fac["display_name"]
+    fac["display_name"] = new_name.strip()
+    save_data(bot.db)
+    await interaction.response.send_message(f"🎖️ Military regime **{old_name}** has been formally renamed to **{new_name.strip()}**!")
+
+@army_group.command(name="rename_squadron", description="Give a custom title to your unit divisions (e.g., 'The Flying Circus').")
+@app_commands.choices(unit=[
+    app_commands.Choice(name="Infantry Division", value="infantry"),
+    app_commands.Choice(name="Panzer/Armor Brigade", value="tanks"),
+    app_commands.Choice(name="Heavy Artillery Battery", value="artillery"),
+    app_commands.Choice(name="Bomber Squadron", value="bombers"),
+    app_commands.Choice(name="Anti-Air Flak Battery", value="flak"),
+    app_commands.Choice(name="Fortified Bunker", value="bunkers")
+])
+async def army_rename_squadron(interaction: discord.Interaction, unit: app_commands.Choice[str], custom_name: str):
+    uid = bot._init_user(interaction.user.id)
+    fid = bot.db["economy"][uid]["faction"]
+    if not fid: return await interaction.response.send_message("Not in a regime.", ephemeral=True)
+    fac = bot.db["factions"][fid]
+    if fac["leader_id"] != str(interaction.user.id): return await interaction.response.send_message("Commander only!", ephemeral=True)
+    
+    sq_names = fac.setdefault("squadron_names", {})
+    sq_names[unit.value] = custom_name.strip()
+    save_data(bot.db)
+    await interaction.response.send_message(f"🪖 Your **{UNIT_STATS[unit.value]['name']}** forces will now be known as **\"{custom_name.strip()}\"**!")
 
 @army_group.command(name="join", description="Join an existing Military Regime.")
 async def army_join(interaction: discord.Interaction, regime_name: str):
@@ -1362,6 +1579,7 @@ async def army_info(interaction: discord.Interaction, regime_name: str = None, t
     fac = bot.db["factions"][fid]
     atk, def_pow = get_faction_power(fac)
     army = fac.get("army", {})
+    sq_names = fac.get("squadron_names", {})
     
     is_ally = (my_fid == fid) or (my_fid and fid in bot.db["factions"][my_fid].get("treaties", []))
     has_spy_report = False
@@ -1382,8 +1600,11 @@ async def army_info(interaction: discord.Interaction, regime_name: str = None, t
             value=f"```ansi\n\u001b[1;31mOFFENSE (ATK): {atk:,}\u001b[0m\n\u001b[1;34mDEFENSE (DEF): {def_pow:,}\u001b[0m\n```", 
             inline=False
         )
-        troops_desc = "\n".join([f"**{UNIT_STATS[u]['name']}**: `{army.get(u, 0):,}`" for u in UNIT_STATS])
-        embed.add_field(name="🎖️ Exact Garrison Forces", value=troops_desc or "No forces garrisoned.", inline=False)
+        troops_lines = []
+        for u in UNIT_STATS:
+            title = sq_names.get(u, UNIT_STATS[u]["name"])
+            troops_lines.append(f"**{title}**: `{army.get(u, 0):,}`")
+        embed.add_field(name="🎖️ Exact Garrison Forces", value="\n".join(troops_lines) or "No forces garrisoned.", inline=False)
         if has_spy_report: embed.set_footer(text="🔓 UNLOCKED VIA /WAR SPY DOSSIER")
     else:
         embed.add_field(name="💰 War Treasury", value="`[CLASSIFIED — REQUIRES /WAR SPY]`", inline=True)
@@ -1717,12 +1938,17 @@ async def war_spy(interaction: discord.Interaction, target_regime: str):
         bot.db["intel_dossiers"].setdefault(attacker_fid, {})[defender_fid] = time.time() + 7200
         save_data(bot.db)
         army = def_fac.get("army", {})
-        troops_txt = "\n".join([f"• **{UNIT_STATS[u]['name']}:** `{army.get(u,0):,}`" for u in UNIT_STATS])
+        sq_names = def_fac.get("squadron_names", {})
+        troops_lines = []
+        for u in UNIT_STATS:
+            title = sq_names.get(u, UNIT_STATS[u]["name"])
+            troops_lines.append(f"• **{title}:** `{army.get(u,0):,}`")
+            
         embed = discord.Embed(title=f"🕵️ CLANDESTINE INTEL DOSSIER: {def_fac['display_name'].upper()}", color=0x3498db)
         embed.description = "Fog of War stripped! Exact enemy numbers are now visible to your regime for **2 Hours** via `/army info`."
         embed.add_field(name="💰 War Treasury", value=f"**{def_fac['treasury']:,} DDR**", inline=True)
         embed.add_field(name="📜 Doctrine", value=f"`{def_fac['doctrine'].upper()}`", inline=True)
-        embed.add_field(name="🎖️ Exact Garrison Forces", value=troops_txt or "No troops garrisoned.", inline=False)
+        embed.add_field(name="🎖️ Exact Garrison Forces", value="\n".join(troops_lines) or "No troops garrisoned.", inline=False)
         await interaction.response.send_message(embed=embed)
     else:
         ransom = min(atk_fac["treasury"], 500)
@@ -1786,7 +2012,7 @@ async def war_declare_enemy(interaction: discord.Interaction, target_regime: str
     save_data(bot.db)
     await interaction.response.send_message(f"⚔️ **{bot.db['factions'][target_fid]['display_name']}** marked as an Enemy of the State!")
 
-# --- NEW ZERO-CD BEG & CASH METHODS ---
+# --- ZERO-CD BEG & CASH METHODS ---
 @bot.tree.command(name="beg", description="Beg for loose change (0 cooldown, negligible payout).")
 async def beg_slash(interaction: discord.Interaction):
     payout = random.randint(1, 15)
@@ -1916,7 +2142,6 @@ async def contract_slash(interaction: discord.Interaction):
     view = ContractMinigameView(interaction.user, title, correct, opts)
     await interaction.response.send_message(embed=embed, view=view)
 
-# Smuggling Cooldown Reduced from 900s to 450s
 @bot.tree.command(name="smuggle", description="Transport border contraband for push-your-luck payouts.")
 async def smuggle_slash(interaction: discord.Interaction):
     uid = bot._init_user(interaction.user.id)
@@ -1959,7 +2184,6 @@ async def invest_slash(interaction: discord.Interaction, action: app_commands.Ch
         save_data(bot.db)
         await interaction.response.send_message(f"💵 Withdrew **{amount:,} DDR** from your municipal bond fund. Liquid Cash: **{user_data['balance']:,} DDR**.")
 
-# --- ROB COMMAND NERFED (MAX 100 DDR CAP) ---
 @bot.tree.command(name="rob", description="Attempt petty theft on another player's wallet (Max 100 DDR).")
 async def rob_slash(interaction: discord.Interaction, target: discord.User):
     if target.bot or target.id == interaction.user.id: return await interaction.response.send_message("Invalid target.", ephemeral=True)
@@ -2032,7 +2256,7 @@ async def loan_slash(interaction: discord.Interaction, action: app_commands.Choi
         save_data(bot.db)
         await interaction.response.send_message(f"✅ Loan repaid in full (**{owed_amount:,} DDR**). Credit cleared.")
 
-# --- CASINO COMMANDS (UNIFIED CONTAINER THEME & MULTIPLAYER BLACKJACK) ---
+# --- CASINO COMMANDS ---
 @bot.tree.command(name="coinflip", description="Classic coin flip for double or nothing.")
 @app_commands.choices(side=[
     app_commands.Choice(name="Heads", value="heads"),
